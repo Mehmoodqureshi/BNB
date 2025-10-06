@@ -8,6 +8,9 @@ import { useFilters } from '../providers/FilterProvider';
 import Button from '../ui/Button';
 import DateFilter from '../filters/DateFilter';
 import GuestsFilter from '../filters/GuestsFilter';
+import StripeCheckout from '../payments/StripeCheckout';
+import PaymentSuccess from '../payments/PaymentSuccess';
+import { PaymentMethod } from '@/lib/types/payments';
 
 interface Property {
   id: string;
@@ -46,6 +49,38 @@ const ReservationPage: React.FC<ReservationPageProps> = ({ property, onBack }) =
   const { filters, updateFilters } = useFilters();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [paymentIntentId, setPaymentIntentId] = useState<string>('');
+  
+  // Mock payment methods - in real app, this would come from user's saved payment methods
+  const [paymentMethods] = useState<PaymentMethod[]>([
+    {
+      id: 'pm_1',
+      type: 'card',
+      card: {
+        brand: 'visa',
+        last4: '4242',
+        exp_month: 12,
+        exp_year: 2025,
+        funding: 'credit'
+      },
+      is_default: true,
+      created_at: '2024-01-15T10:30:00Z'
+    },
+    {
+      id: 'pm_2',
+      type: 'card',
+      card: {
+        brand: 'mastercard',
+        last4: '5555',
+        exp_month: 8,
+        exp_year: 2026,
+        funding: 'debit'
+      },
+      is_default: false,
+      created_at: '2024-01-10T14:20:00Z'
+    }
+  ]);
 
   // Initialize filters with property defaults
   useEffect(() => {
@@ -54,7 +89,7 @@ const ReservationPage: React.FC<ReservationPageProps> = ({ property, onBack }) =
         guests: { adults: 1, children: 0, infants: 0 }
       });
     }
-  }, [filters.checkIn, filters.checkOut, updateFilters]);
+  }, [filters.checkIn, filters.checkOut]);
 
   const calculateNights = () => {
     if (!filters.checkIn || !filters.checkOut) return 0;
@@ -85,47 +120,63 @@ const ReservationPage: React.FC<ReservationPageProps> = ({ property, onBack }) =
       return;
     }
     
-    setIsProcessing(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsProcessing(false);
+    // Show payment flow instead of direct booking
+    setShowPayment(true);
+  };
+
+  const handlePaymentSuccess = (paymentIntentId: string) => {
+    setPaymentIntentId(paymentIntentId);
+    setShowPayment(false);
     setIsSuccess(true);
+  };
+
+  const handlePaymentError = (error: string) => {
+    console.error('Payment failed:', error);
+    // You could show an error message to the user here
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPayment(false);
   };
 
   const pricing = calculateTotal();
 
   if (isSuccess) {
     return (
+      <PaymentSuccess
+        paymentIntentId={paymentIntentId}
+        amount={pricing.total}
+        currency="aed"
+        bookingId={`bk_${Date.now()}`}
+        propertyTitle={property.title}
+        checkIn={filters.checkIn!}
+        checkOut={filters.checkOut!}
+        guests={filters.guests.adults + filters.guests.children + filters.guests.infants}
+        onViewBooking={() => {
+          // Navigate to bookings page
+          window.location.href = '/bookings';
+        }}
+        onDownloadReceipt={() => {
+          console.log('Download receipt for:', paymentIntentId);
+        }}
+      />
+    );
+  }
+
+  if (showPayment) {
+    return (
       <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="text-center">
-            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-6" />
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-              Booking Confirmed!
-            </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
-              Your reservation has been successfully created. You will receive a confirmation email shortly.
-            </p>
-            <div className="space-y-4">
-              <Button
-                variant="primary"
-                size="lg"
-                isDark={isDark}
-                onClick={onBack}
-                className="mr-4"
-              >
-                Back to Property
-              </Button>
-              <Button
-                variant="secondary"
-                size="lg"
-                isDark={isDark}
-                onClick={() => window.location.href = '/'}
-              >
-                Browse More Properties
-              </Button>
-            </div>
-          </div>
+          <StripeCheckout
+            amount={pricing.total}
+            currency="aed"
+            description={`Booking for ${property.title}`}
+            paymentMethods={paymentMethods}
+            onPaymentSuccess={handlePaymentSuccess}
+            onPaymentError={handlePaymentError}
+            onCancel={handlePaymentCancel}
+            isLoading={isProcessing}
+          />
         </div>
       </div>
     );

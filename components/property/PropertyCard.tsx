@@ -26,6 +26,8 @@ interface Property {
   amenities: string[];
   viewType?: string;
   furnishing: 'Fully Furnished' | 'Semi-Furnished' | 'Unfurnished';
+  lat: number;
+  lng: number;
 }
 
 interface PropertyCardProps {

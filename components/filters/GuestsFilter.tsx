@@ -47,7 +47,7 @@ export default function GuestsFilter({ isActive = false, onClick }: GuestsFilter
     
     const newGuests = { ...localGuests, [type]: newCount };
     setLocalGuests(newGuests);
-    updateFilters({ guests: newGuests });
+    // Don't update global filters immediately - wait for Apply button
   };
 
   const getGuestText = () => {

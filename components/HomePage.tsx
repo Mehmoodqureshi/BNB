@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Map, Star, Heart } from 'lucide-react';
+import { Search, Filter, Map, Star, Heart, Grid3X3 } from 'lucide-react';
 import PropertyCard from './property/PropertyCard';
 import Button from '@/components/ui/Button';
 import { clsx } from 'clsx';
 import { useTheme } from './providers/ThemeProvider';
 import { useFilters } from './providers/FilterProvider';
 import SearchModal from './filters/SearchModal';
+import BnbGoogleMapComponent from './map/BnbGoogleMapComponent';
 import PropertyTypeFilter from './filters/PropertyTypeFilter';
 import BedroomsFilter from './filters/BedroomsFilter';
 import BathroomsFilter from './filters/BathroomsFilter';
@@ -36,6 +37,10 @@ interface Property {
   amenities: string[];
   viewType?: string;
   furnishing: 'Fully Furnished' | 'Semi-Furnished' | 'Unfurnished';
+  lat: number;
+  lng: number;
+  agency_id?: string;
+  rent?: number;
 }
 
 const HomePage: React.FC = () => {
@@ -44,6 +49,7 @@ const HomePage: React.FC = () => {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
 
   // UAE Property data
   const properties: Property[] = [
@@ -70,7 +76,11 @@ const HomePage: React.FC = () => {
       slug: 'luxury-apartment-downtown-dubai',
       amenities: ['Wifi', 'Pool', 'Gym', 'Concierge', 'Parking'],
       viewType: 'City View',
-      furnishing: 'Fully Furnished'
+      furnishing: 'Fully Furnished',
+      lat: 25.1972,
+      lng: 55.2744,
+      agency_id: 'agency_1',
+      rent: 450
     },
     {
       id: '2',
@@ -95,7 +105,11 @@ const HomePage: React.FC = () => {
       slug: 'beachfront-villa-palm-jumeirah',
       amenities: ['Private Beach', 'Pool', 'BBQ Area', 'Garden', 'Maid\'s Room'],
       viewType: 'Sea View',
-      furnishing: 'Fully Furnished'
+      furnishing: 'Fully Furnished',
+      lat: 25.1124,
+      lng: 55.1390,
+      agency_id: 'agency_2',
+      rent: 1200
     },
     {
       id: '3',
@@ -120,7 +134,11 @@ const HomePage: React.FC = () => {
       slug: 'modern-penthouse-dubai-marina',
       amenities: ['Marina View', 'Balcony', 'Gym', 'Pool', 'Valet Parking'],
       viewType: 'Marina View',
-      furnishing: 'Fully Furnished'
+      furnishing: 'Fully Furnished',
+      lat: 25.0772,
+      lng: 55.1308,
+      agency_id: 'agency_3',
+      rent: 800
     },
     {
       id: '4',
@@ -145,7 +163,11 @@ const HomePage: React.FC = () => {
       slug: 'cozy-apartment-jbr-dubai',
       amenities: ['Beach Access', 'Wifi', 'Air Conditioning', 'Kitchen'],
       viewType: 'Sea View',
-      furnishing: 'Semi-Furnished'
+      furnishing: 'Semi-Furnished',
+      lat: 25.0772,
+      lng: 55.1308,
+      agency_id: 'agency_4',
+      rent: 350
     },
     {
       id: '5',
@@ -170,7 +192,11 @@ const HomePage: React.FC = () => {
       slug: 'luxury-villa-saadiyat-island',
       amenities: ['Private Beach', 'Golf Course', 'Spa', 'Garden', 'Maid\'s Room', 'Study Room'],
       viewType: 'Golf Course View',
-      furnishing: 'Fully Furnished'
+      furnishing: 'Fully Furnished',
+      lat: 24.5431,
+      lng: 54.4331,
+      agency_id: 'agency_5',
+      rent: 1500
     },
     {
       id: '6',
@@ -195,7 +221,11 @@ const HomePage: React.FC = () => {
       slug: 'modern-apartment-corniche-abu-dhabi',
       amenities: ['Corniche View', 'Gym', 'Pool', 'Parking', 'Concierge'],
       viewType: 'Corniche View',
-      furnishing: 'Fully Furnished'
+      furnishing: 'Fully Furnished',
+      lat: 24.4539,
+      lng: 54.3773,
+      agency_id: 'agency_6',
+      rent: 400
     }
   ];
 
@@ -372,7 +402,7 @@ const HomePage: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {filteredProperties.length} properties in UAE
+                ({filteredProperties.length}) Properties
               </h2>
               {filters.location && (
                 <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -381,7 +411,7 @@ const HomePage: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center space-x-3">
+            {/* <div className="flex items-center space-x-3">
               <button
                 onClick={() => setIsSearchModalOpen(true)}
                 className="flex items-center space-x-2 px-4 py-2 rounded-full border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -400,24 +430,34 @@ const HomePage: React.FC = () => {
                   {showMap ? 'Show list' : 'Show map'}
                 </span>
               </button>
-            </div>
+            </div> */}
           </div>
         </div>
       </section>
 
-      {/* Properties Grid */}
+      {/* Properties Grid or Map */}
       <section className="pb-8 px-4">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-wrap gap-4">
-            {filteredProperties.map((property) => (
-              <PropertyCard
-                key={property.id}
-                property={property}
-                onFavorite={handleFavorite}
-                isFavorited={favorites.includes(property.id)}
+          {showMap ? (
+            <div className="h-[600px] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+              <BnbGoogleMapComponent
+                allProperties={filteredProperties}
+                setSelectedBox={setSelectedProperty}
+                bbox={false}
               />
-            ))}
-          </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-4">
+              {filteredProperties.map((property) => (
+                <PropertyCard
+                  key={property.id}
+                  property={property}
+                  onFavorite={handleFavorite}
+                  isFavorited={favorites.includes(property.id)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
