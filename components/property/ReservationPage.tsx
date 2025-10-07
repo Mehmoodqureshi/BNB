@@ -142,6 +142,11 @@ const ReservationPage: React.FC<ReservationPageProps> = ({ property, onBack }) =
   const pricing = calculateTotal();
 
   if (isSuccess) {
+    const checkInDate = filters.checkIn;
+    const checkOutDate = filters.checkOut;
+    const checkInString = checkInDate instanceof Date ? checkInDate.toISOString() : (checkInDate || '');
+    const checkOutString = checkOutDate instanceof Date ? checkOutDate.toISOString() : (checkOutDate || '');
+    
     return (
       <PaymentSuccess
         paymentIntentId={paymentIntentId}
@@ -149,8 +154,8 @@ const ReservationPage: React.FC<ReservationPageProps> = ({ property, onBack }) =
         currency="aed"
         bookingId={`bk_${Date.now()}`}
         propertyTitle={property.title}
-        checkIn={filters.checkIn!}
-        checkOut={filters.checkOut!}
+        checkIn={checkInString}
+        checkOut={checkOutString}
         guests={filters.guests.adults + filters.guests.children + filters.guests.infants}
         onViewBooking={() => {
           // Navigate to bookings page
@@ -244,7 +249,7 @@ const ReservationPage: React.FC<ReservationPageProps> = ({ property, onBack }) =
               </h3>
               
               {/* Hero Section Style Filters */}
-              <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20 dark:border-gray-700/50">
+              <div className="bg-white dark:bg-gray-800/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-gray-200 dark:border-gray-700/50">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Check In */}
                   <div className="space-y-1">

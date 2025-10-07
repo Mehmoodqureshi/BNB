@@ -5,17 +5,21 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { useRouter } from 'next/navigation';
 import { 
   Calendar, MapPin, Star, Clock, Search, Filter, 
-  ChevronLeft, ChevronRight, Eye, MessageCircle, Heart
+  ChevronLeft, ChevronRight, Eye, MessageCircle, Heart, DollarSign, StarOff
 } from 'lucide-react';
+import { calculateRefundAmount, formatCurrency } from '@/lib/services/paymentCalculations';
 
 const BookingsPage: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past' | 'cancelled'>('upcoming');
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [showRefundInfo, setShowRefundInfo] = useState<string | null>(null);
+  const [reviewedBookings, setReviewedBookings] = useState<string[]>(['3']); // Mock: booking 3 already reviewed
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-100 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#006699] border-t-transparent mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Loading your bookings...</p>
@@ -29,7 +33,15 @@ const BookingsPage: React.FC = () => {
     return null;
   }
 
-  // Mock booking data
+  // Mock booking data (using current dates)
+  const today = new Date();
+  const futureDate1 = new Date(today);
+  futureDate1.setDate(today.getDate() + 15); // 15 days from now
+  const futureDate2 = new Date(today);
+  futureDate2.setDate(today.getDate() + 30); // 30 days from now
+  const pastDate = new Date(today);
+  pastDate.setDate(today.getDate() - 60); // 60 days ago
+
   const bookings = {
     upcoming: [
       {
@@ -41,13 +53,14 @@ const BookingsPage: React.FC = () => {
           rating: 4.8,
           reviewCount: 124
         },
-        checkIn: '2024-02-15',
-        checkOut: '2024-02-18',
+        checkIn: futureDate1.toISOString().split('T')[0],
+        checkOut: new Date(futureDate1.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         guests: 2,
         totalPrice: 1350,
         currency: 'AED',
         status: 'confirmed',
-        bookingDate: '2024-01-15'
+        bookingDate: today.toISOString().split('T')[0],
+        cancellationPolicy: 'moderate' as const
       },
       {
         id: '2',
@@ -58,13 +71,14 @@ const BookingsPage: React.FC = () => {
           rating: 4.9,
           reviewCount: 89
         },
-        checkIn: '2024-03-01',
-        checkOut: '2024-03-05',
+        checkIn: futureDate2.toISOString().split('T')[0],
+        checkOut: new Date(futureDate2.getTime() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         guests: 4,
         totalPrice: 4800,
         currency: 'AED',
         status: 'confirmed',
-        bookingDate: '2024-01-20'
+        bookingDate: today.toISOString().split('T')[0],
+        cancellationPolicy: 'flexible' as const
       }
     ],
     past: [
@@ -77,13 +91,14 @@ const BookingsPage: React.FC = () => {
           rating: 4.7,
           reviewCount: 156
         },
-        checkIn: '2023-12-10',
-        checkOut: '2023-12-15',
+        checkIn: pastDate.toISOString().split('T')[0],
+        checkOut: new Date(pastDate.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         guests: 2,
         totalPrice: 4000,
         currency: 'AED',
         status: 'completed',
-        bookingDate: '2023-11-15'
+        bookingDate: new Date(pastDate.getTime() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        cancellationPolicy: 'strict' as const
       }
     ],
     cancelled: []
@@ -92,9 +107,9 @@ const BookingsPage: React.FC = () => {
   const currentBookings = bookings[activeTab];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-100 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20 transition-colors duration-300">
+    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20 transition-colors duration-300">
       {/* Header */}
-      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-xl border-b border-white/20 dark:border-gray-700/50">
+      <div className="bg-white dark:bg-gray-800/80 backdrop-blur-md shadow-xl border-b border-gray-200 dark:border-gray-700/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-6">
             <div className="flex items-center space-x-4">
@@ -126,7 +141,7 @@ const BookingsPage: React.FC = () => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Tabs */}
-        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20 dark:border-gray-700/50 mb-8">
+        <div className="bg-white dark:bg-gray-800/80 rounded-2xl p-6 shadow-xl border border-gray-200 dark:border-gray-700/50 mb-8">
           <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
             {[
               { key: 'upcoming', label: 'Upcoming', count: bookings.upcoming.length },
@@ -154,7 +169,7 @@ const BookingsPage: React.FC = () => {
         {/* Bookings List */}
         <div className="space-y-6">
           {currentBookings.length === 0 ? (
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-12 shadow-xl border border-white/20 dark:border-gray-700/50 text-center">
+            <div className="bg-white dark:bg-gray-800/80 rounded-2xl p-12 shadow-xl border border-gray-200 dark:border-gray-700/50 text-center">
               <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
                 No {activeTab} bookings
@@ -176,7 +191,7 @@ const BookingsPage: React.FC = () => {
             </div>
           ) : (
             currentBookings.map((booking) => (
-              <div key={booking.id} className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20 dark:border-gray-700/50">
+              <div key={booking.id} className="bg-white dark:bg-gray-800/80 rounded-2xl p-6 shadow-xl border border-gray-200 dark:border-gray-700/50">
                 <div className="flex flex-col lg:flex-row gap-6">
                   {/* Property Image */}
                   <div className="lg:w-80">
@@ -208,7 +223,7 @@ const BookingsPage: React.FC = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {booking.totalPrice} {booking.currency}
+                          {booking.currency} {booking.totalPrice.toLocaleString()}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           {booking.guests} guest{booking.guests > 1 ? 's' : ''}
@@ -254,7 +269,7 @@ const BookingsPage: React.FC = () => {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-3 flex-wrap gap-2">
                       <button className="flex items-center space-x-2 px-4 py-2 bg-[#006699] text-white rounded-lg hover:bg-[#005588] transition-colors">
                         <Eye className="h-4 w-4" />
                         <span>View Details</span>
@@ -263,11 +278,91 @@ const BookingsPage: React.FC = () => {
                         <MessageCircle className="h-4 w-4" />
                         <span>Message Host</span>
                       </button>
+                      {activeTab === 'upcoming' && (
+                        <button 
+                          onClick={() => setShowRefundInfo(showRefundInfo === booking.id ? null : booking.id)}
+                          className="flex items-center space-x-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                        >
+                          <DollarSign className="h-4 w-4" />
+                          <span>Check Refund</span>
+                        </button>
+                      )}
+                      {activeTab === 'past' && !reviewedBookings.includes(booking.id) && (
+                        <button 
+                          onClick={() => router.push(`/reviews?bookingId=${booking.id}`)}
+                          className="flex items-center space-x-2 px-4 py-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors"
+                        >
+                          <Star className="h-4 w-4" />
+                          <span>Leave Review</span>
+                        </button>
+                      )}
+                      {activeTab === 'past' && reviewedBookings.includes(booking.id) && (
+                        <button 
+                          onClick={() => router.push('/reviews')}
+                          className="flex items-center space-x-2 px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                        >
+                          <Star className="h-4 w-4 fill-current" />
+                          <span>View Your Review</span>
+                        </button>
+                      )}
                       <button className="flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
                         <Heart className="h-4 w-4" />
                         <span>Add to Wishlist</span>
                       </button>
                     </div>
+
+                    {/* Refund Information */}
+                    {showRefundInfo === booking.id && activeTab === 'upcoming' && (
+                      <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        {(() => {
+                          const refund = calculateRefundAmount(
+                            booking.totalPrice * 100,
+                            new Date(booking.checkIn),
+                            booking.cancellationPolicy || 'moderate'
+                          );
+                          return (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-semibold text-gray-900 dark:text-white">Cancellation Refund</h4>
+                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                  refund.isEligible 
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                    : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                }`}>
+                                  {refund.refundPercentage}% Refund
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">If cancelled today:</p>
+                                  <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                                    {formatCurrency(refund.refundAmount, 'AED')}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Penalty:</p>
+                                  <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                                    {formatCurrency(refund.penaltyAmount, 'AED')}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-gradient-to-r from-green-500 to-emerald-600"
+                                  style={{ width: `${refund.refundPercentage}%` }}
+                                ></div>
+                              </div>
+                              <p className="text-xs text-gray-600 dark:text-gray-400">
+                                {refund.reason}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                Policy: {(booking.cancellationPolicy || 'moderate').charAt(0).toUpperCase() + (booking.cancellationPolicy || 'moderate').slice(1)}
+                              </p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

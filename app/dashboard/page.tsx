@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation';
 import { 
   User, Settings, Calendar, MessageSquare, Heart, Star, Shield, Camera, 
   MapPin, Clock, TrendingUp, Award, Bell, CreditCard, Globe, 
-  ChevronRight, Plus, Search, Filter, HelpCircle
+  ChevronRight, Plus, Search, Filter, HelpCircle, DollarSign
 } from 'lucide-react';
 import UserProfileModal from '@/components/auth/UserProfileModal';
+import RefundCalculatorModal from '@/components/payments/RefundCalculatorModal';
 
 const DashboardPage: React.FC = () => {
   const { user, isAuthenticated, isLoading, uploadProfilePicture } = useAuth();
@@ -16,12 +17,13 @@ const DashboardPage: React.FC = () => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [showRefundModal, setShowRefundModal] = useState(false);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-600 border-t-transparent mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#006699] border-t-transparent mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Loading your dashboard...</p>
         </div>
       </div>
@@ -84,9 +86,9 @@ const DashboardPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-100 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20 transition-colors duration-300">
+    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20 transition-colors duration-300">
       {/* Glassy Header */}
-      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-xl border-b border-white/20 dark:border-gray-700/50">
+      <div className="bg-white dark:bg-gray-800/80 backdrop-blur-md shadow-xl border-b border-gray-200 dark:border-gray-700/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
@@ -147,9 +149,9 @@ const DashboardPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 dark:border-gray-700/50">
+          {/* Stats Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white dark:bg-gray-800/70 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700/50">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Bookings</p>
@@ -161,7 +163,7 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 dark:border-gray-700/50">
+          <div className="bg-white dark:bg-gray-800/70 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700/50">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Average Rating</p>
@@ -173,7 +175,7 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 dark:border-gray-700/50">
+          <div className="bg-white dark:bg-gray-800/70 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700/50">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Reviews</p>
@@ -185,7 +187,7 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 dark:border-gray-700/50">
+          <div className="bg-white dark:bg-gray-800/70 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700/50">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Years Hosting</p>
@@ -203,8 +205,8 @@ const DashboardPage: React.FC = () => {
           
           {/* Left Column - Profile & Quick Actions */}
           <div className="space-y-6">
-            {/* Profile Card */}
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20 dark:border-gray-700/50">
+              {/* Profile Card */}
+              <div className="bg-white dark:bg-gray-800/80 rounded-2xl p-6 shadow-xl border border-gray-200 dark:border-gray-700/50">
               <div className="text-center">
                 <div className="relative inline-block">
                   <img
@@ -257,8 +259,8 @@ const DashboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Verification Status */}
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20 dark:border-gray-700/50">
+              {/* Verification Status */}
+              <div className="bg-white dark:bg-gray-800/80 rounded-2xl p-6 shadow-xl border border-gray-200 dark:border-gray-700/50">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                 <Shield className="h-5 w-5 text-[#006699] mr-2" />
                 Verification Status
@@ -309,8 +311,8 @@ const DashboardPage: React.FC = () => {
 
           {/* Right Column - Main Features */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Quick Actions */}
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20 dark:border-gray-700/50">
+              {/* Quick Actions */}
+              <div className="bg-white dark:bg-gray-800/80 rounded-2xl p-6 shadow-xl border border-gray-200 dark:border-gray-700/50">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button 
@@ -370,6 +372,34 @@ const DashboardPage: React.FC = () => {
                 </button>
 
                 <button 
+                  onClick={() => router.push('/reviews')}
+                  className="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
+                >
+                  <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
+                    <Star className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                  </div>
+                  <div className="text-left">
+                    <h4 className="font-medium text-gray-900 dark:text-white">Reviews & Ratings</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">View and leave reviews</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-gray-400 ml-auto" />
+                </button>
+
+                <button 
+                  onClick={() => setShowRefundModal(true)}
+                  className="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
+                >
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                    <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="text-left">
+                    <h4 className="font-medium text-gray-900 dark:text-white">Refund Calculator</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Check cancellation refunds</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-gray-400 ml-auto" />
+                </button>
+
+                <button 
                   onClick={() => router.push('/support')}
                   className="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
                 >
@@ -387,8 +417,8 @@ const DashboardPage: React.FC = () => {
                   onClick={() => router.push('/settings')}
                   className="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
                 >
-                  <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
-                    <Settings className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                  <div className="p-2 bg-gray-200 dark:bg-gray-600 rounded-lg">
+                    <Settings className="h-5 w-5 text-gray-600 dark:text-gray-300" />
                   </div>
                   <div className="text-left">
                     <h4 className="font-medium text-gray-900 dark:text-white">Settings</h4>
@@ -399,8 +429,8 @@ const DashboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Recent Activity */}
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20 dark:border-gray-700/50">
+              {/* Recent Activity */}
+              <div className="bg-white dark:bg-gray-800/80 rounded-2xl p-6 shadow-xl border border-gray-200 dark:border-gray-700/50">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Activity</h3>
               <div className="space-y-3">
                 <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
@@ -411,7 +441,7 @@ const DashboardPage: React.FC = () => {
                     <h4 className="font-medium text-gray-900 dark:text-white text-sm">New booking confirmed</h4>
                     <p className="text-xs text-gray-600 dark:text-gray-400">2 days ago</p>
                   </div>
-                  <span className="text-xs font-medium text-green-600 dark:text-green-400">+$150</span>
+                  <span className="text-xs font-medium text-green-600 dark:text-green-400">+AED 150</span>
                 </div>
 
                 <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
@@ -445,6 +475,12 @@ const DashboardPage: React.FC = () => {
       <UserProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
+      />
+
+      {/* Refund Calculator Modal */}
+      <RefundCalculatorModal
+        isOpen={showRefundModal}
+        onClose={() => setShowRefundModal(false)}
       />
     </div>
   );

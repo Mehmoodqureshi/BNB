@@ -19,7 +19,7 @@ const PaymentMethodsPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-100 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#006699] border-t-transparent mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Loading payment methods...</p>
@@ -134,9 +134,9 @@ const PaymentMethodsPage: React.FC = () => {
   const defaultPaymentMethod = paymentMethods.find(pm => pm.is_default);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-100 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20 transition-colors duration-300">
+    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20 transition-colors duration-300">
       {/* Header */}
-      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-xl border-b border-white/20 dark:border-gray-700/50">
+      <div className="bg-white dark:bg-gray-800/80 backdrop-blur-md shadow-xl border-b border-gray-200 dark:border-gray-700/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-6">
             <div className="flex items-center space-x-4">
@@ -170,7 +170,7 @@ const PaymentMethodsPage: React.FC = () => {
         <div className="space-y-8">
           {/* Default Payment Method */}
           {defaultPaymentMethod && (
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20 dark:border-gray-700/50">
+            <div className="bg-white dark:bg-gray-800/80 rounded-2xl p-6 shadow-xl border border-gray-200 dark:border-gray-700/50">
               <div className="flex items-center space-x-3 mb-4">
                 <Star className="h-5 w-5 text-yellow-500 fill-current" />
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Default Payment Method</h2>
@@ -185,7 +185,7 @@ const PaymentMethodsPage: React.FC = () => {
           )}
 
           {/* All Payment Methods */}
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20 dark:border-gray-700/50">
+          <div className="bg-white dark:bg-gray-800/80 rounded-2xl p-6 shadow-xl border border-gray-200 dark:border-gray-700/50">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 All Payment Methods ({paymentMethods.length})
@@ -229,7 +229,7 @@ const PaymentMethodsPage: React.FC = () => {
           </div>
 
           {/* Security Information */}
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20 dark:border-gray-700/50">
+          <div className="bg-white dark:bg-gray-800/80 rounded-2xl p-6 shadow-xl border border-gray-200 dark:border-gray-700/50">
             <div className="flex items-start space-x-4">
               <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg">
                 <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
@@ -257,7 +257,7 @@ const PaymentMethodsPage: React.FC = () => {
           </div>
 
           {/* Billing Information */}
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20 dark:border-gray-700/50">
+          <div className="bg-white dark:bg-gray-800/80 rounded-2xl p-6 shadow-xl border border-gray-200 dark:border-gray-700/50">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Billing Information</h3>
               <button className="text-sm text-[#006699] hover:text-[#005588] font-medium">

@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Home, MapPin, Users, Bed, Bath, Car, Wifi, 
   Shield, Coffee, Waves, Camera, Plus, X, 
-  Save, Eye, AlertCircle, CheckCircle, DollarSign, Map, Navigation
+  Save, Eye, AlertCircle, CheckCircle, DollarSign, Map, Navigation,
+  Upload, Image as ImageIcon, Trash2, Star, MoveUp, MoveDown
 } from 'lucide-react';
 import { PropertyListing, PropertyAmenity, PropertyPhoto } from '@/lib/types/host';
 import Button from '../ui/Button';
@@ -23,7 +24,10 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
   initialData,
   isLoading = false
 }) => {
-  const [step, setStep] = useState<'basic' | 'location' | 'capacity' | 'amenities' | 'houseRules' | 'pricing' | 'review'>('basic');
+  const [step, setStep] = useState<'basic' | 'location' | 'capacity' | 'amenities' | 'photos' | 'houseRules' | 'pricing' | 'review'>('basic');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedPhotos, setUploadedPhotos] = useState<PropertyPhoto[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const [formData, setFormData] = useState<Partial<PropertyListing>>({
     title: '',
     description: '',
@@ -37,6 +41,7 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
     },
     location: {
       address: '',
+      city: '',
       emirate: 'Dubai',
       country: 'UAE',
       lat: 0,
@@ -187,6 +192,11 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
       case 'amenities':
         // Amenities step doesn't require validation - amenities are optional
         break;
+      case 'photos':
+        if (uploadedPhotos.length < 5) {
+          newErrors.photos = 'You must upload at least 5 photos of your property';
+        }
+        break;
       case 'houseRules':
         // House rules step doesn't require validation - rules are optional
         break;
@@ -204,7 +214,7 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
   const handleNext = () => {
     if (!validateStep(step)) return;
 
-    const steps = ['basic', 'location', 'capacity', 'amenities', 'houseRules', 'pricing', 'review'];
+    const steps = ['basic', 'location', 'capacity', 'amenities', 'photos', 'houseRules', 'pricing', 'review'];
     const currentIndex = steps.indexOf(step);
     if (currentIndex < steps.length - 1) {
       setStep(steps[currentIndex + 1] as any);
@@ -212,11 +222,129 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
   };
 
   const handlePrevious = () => {
-    const steps = ['basic', 'location', 'capacity', 'amenities', 'houseRules', 'pricing', 'review'];
+    const steps = ['basic', 'location', 'capacity', 'amenities', 'photos', 'houseRules', 'pricing', 'review'];
     const currentIndex = steps.indexOf(step);
     if (currentIndex > 0) {
       setStep(steps[currentIndex - 1] as any);
     }
+  };
+
+  // Photo upload handlers
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+    
+    handleFiles(Array.from(files));
+  };
+
+  const handleFiles = (files: File[]) => {
+    const validFiles = files.filter(file => {
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        alert(`${file.name} is not an image file`);
+        return false;
+      }
+      
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`${file.name} is too large. Maximum size is 5MB`);
+        return false;
+      }
+      
+      return true;
+    });
+
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const newPhoto: PropertyPhoto = {
+          id: `photo-${Date.now()}-${Math.random()}`,
+          url: e.target?.result as string,
+          isPrimary: uploadedPhotos.length === 0, // First photo is primary
+          order: uploadedPhotos.length + 1,
+          uploadedAt: new Date().toISOString(),
+          fileSize: file.size,
+          dimensions: { width: 0, height: 0 } // Will be calculated if needed
+        };
+        
+        setUploadedPhotos(prev => [...prev, newPhoto]);
+        setFormData(prev => ({
+          ...prev,
+          photos: [...(prev.photos || []), newPhoto]
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    handleFiles(files);
+  };
+
+  const handleRemovePhoto = (photoId: string) => {
+    const updatedPhotos = uploadedPhotos.filter(p => p.id !== photoId);
+    // Re-assign order
+    const reorderedPhotos = updatedPhotos.map((photo, index) => ({
+      ...photo,
+      order: index + 1,
+      isPrimary: index === 0 // First photo becomes primary
+    }));
+    
+    setUploadedPhotos(reorderedPhotos);
+    setFormData(prev => ({
+      ...prev,
+      photos: reorderedPhotos
+    }));
+  };
+
+  const handleSetPrimaryPhoto = (photoId: string) => {
+    const updatedPhotos = uploadedPhotos.map(photo => ({
+      ...photo,
+      isPrimary: photo.id === photoId
+    }));
+    
+    setUploadedPhotos(updatedPhotos);
+    setFormData(prev => ({
+      ...prev,
+      photos: updatedPhotos
+    }));
+  };
+
+  const handleMovePhoto = (photoId: string, direction: 'up' | 'down') => {
+    const currentIndex = uploadedPhotos.findIndex(p => p.id === photoId);
+    if (currentIndex === -1) return;
+    
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= uploadedPhotos.length) return;
+    
+    const newPhotos = [...uploadedPhotos];
+    [newPhotos[currentIndex], newPhotos[newIndex]] = [newPhotos[newIndex], newPhotos[currentIndex]];
+    
+    // Update order
+    const reorderedPhotos = newPhotos.map((photo, index) => ({
+      ...photo,
+      order: index + 1
+    }));
+    
+    setUploadedPhotos(reorderedPhotos);
+    setFormData(prev => ({
+      ...prev,
+      photos: reorderedPhotos
+    }));
   };
 
   const handleSubmit = async () => {
@@ -235,7 +363,7 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
       houseRules: formData.houseRules!,
       pricing: formData.pricing!,
       availability: formData.availability!,
-      photos: formData.photos!,
+      photos: uploadedPhotos,
       status: 'draft',
       isActive: false,
       createdAt: new Date().toISOString(),
@@ -396,6 +524,43 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
             Click the map icon to select your property location
           </p>
         </div>
+
+        {/* Coordinates Display */}
+        {formData.location?.lat !== 0 && formData.location?.lng !== 0 && (
+          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-700">
+            <div className="flex items-start space-x-3">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center">
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mr-1.5" />
+                  Location Coordinates
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-blue-200 dark:border-blue-700">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Latitude</p>
+                    <p className="text-sm font-mono font-semibold text-gray-900 dark:text-white">
+                      {formData.location?.lat.toFixed(6)}°
+                    </p>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-blue-200 dark:border-blue-700">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Longitude</p>
+                    <p className="text-sm font-mono font-semibold text-gray-900 dark:text-white">
+                      {formData.location?.lng.toFixed(6)}°
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center space-x-2">
+                  <Navigation className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Precise location set for property mapping
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -621,6 +786,223 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
     </div>
   );
 
+  const renderPhotosStep = () => (
+    <div className="space-y-6">
+      <div className="text-center">
+        <Camera className="h-12 w-12 text-[#006699] mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          Upload Photos
+        </h3>
+        <p className="text-gray-600 dark:text-gray-400">
+          Add at least 5 high-quality photos of your property
+        </p>
+        <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+          First photo will be your cover image
+        </p>
+      </div>
+
+      {/* Upload Area */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className={`
+          border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200
+          ${isDragging 
+            ? 'border-[#006699] bg-[#006699]/5 dark:bg-[#006699]/10 scale-105' 
+            : 'border-gray-300 dark:border-gray-600 hover:border-[#006699] dark:hover:border-[#006699] hover:bg-gray-50 dark:hover:bg-gray-800/50'
+          }
+        `}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        
+        <div className="space-y-4">
+          <div className="flex justify-center">
+            <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-full">
+              <Upload className="h-8 w-8 text-gray-600 dark:text-gray-400" />
+            </div>
+          </div>
+          
+          <div>
+            <p className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+              Drag and drop photos here
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              or click to browse from your computer
+            </p>
+          </div>
+          
+          <div className="flex items-center justify-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
+            <span className="flex items-center">
+              <ImageIcon className="h-4 w-4 mr-1" />
+              JPG, PNG, WebP
+            </span>
+            <span>•</span>
+            <span>Max 5MB per file</span>
+            <span>•</span>
+            <span className="font-medium text-[#006699]">
+              {uploadedPhotos.length}/5 uploaded
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {errors.photos && (
+        <div className="flex items-center space-x-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+          <p className="text-sm text-red-600 dark:text-red-400">{errors.photos}</p>
+        </div>
+      )}
+
+      {/* Uploaded Photos Grid */}
+      {uploadedPhotos.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Uploaded Photos ({uploadedPhotos.length})
+            </h4>
+            {uploadedPhotos.length >= 5 && (
+              <div className="flex items-center space-x-2 text-green-600 dark:text-green-400">
+                <CheckCircle className="h-5 w-5" />
+                <span className="text-sm font-medium">Minimum requirement met!</span>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {uploadedPhotos.map((photo, index) => (
+              <div
+                key={photo.id}
+                className="relative group bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 overflow-hidden hover:border-[#006699] transition-all duration-200"
+              >
+                {/* Photo Image */}
+                <div className="aspect-square relative">
+                  <img
+                    src={photo.url}
+                    alt={`Property photo ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  
+                  {/* Primary Badge */}
+                  {photo.isPrimary && (
+                    <div className="absolute top-2 left-2 bg-[#006699] text-white px-2 py-1 rounded text-xs font-medium flex items-center space-x-1">
+                      <Star className="h-3 w-3 fill-current" />
+                      <span>Cover</span>
+                    </div>
+                  )}
+
+                  {/* Order Badge */}
+                  <div className="absolute top-2 right-2 bg-black/70 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium">
+                    {index + 1}
+                  </div>
+
+                  {/* Hover Overlay with Actions */}
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                    <div className="flex flex-col space-y-2">
+                      {/* Move Up/Down */}
+                      <div className="flex items-center justify-center space-x-2">
+                        {index > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMovePhoto(photo.id, 'up');
+                            }}
+                            className="p-2 bg-white/90 hover:bg-white rounded-full transition-colors"
+                            title="Move up"
+                          >
+                            <MoveUp className="h-4 w-4 text-gray-900" />
+                          </button>
+                        )}
+                        {index < uploadedPhotos.length - 1 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMovePhoto(photo.id, 'down');
+                            }}
+                            className="p-2 bg-white/90 hover:bg-white rounded-full transition-colors"
+                            title="Move down"
+                          >
+                            <MoveDown className="h-4 w-4 text-gray-900" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Set as Primary */}
+                      {!photo.isPrimary && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSetPrimaryPhoto(photo.id);
+                          }}
+                          className="px-3 py-1.5 bg-[#006699] hover:bg-[#005588] text-white rounded-full text-xs font-medium transition-colors flex items-center space-x-1"
+                        >
+                          <Star className="h-3 w-3" />
+                          <span>Set as Cover</span>
+                        </button>
+                      )}
+
+                      {/* Delete */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemovePhoto(photo.id);
+                        }}
+                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-medium transition-colors flex items-center space-x-1"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        <span>Remove</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Photo Info */}
+                <div className="p-2 bg-gray-50 dark:bg-gray-700/50">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                    {(photo.fileSize / 1024).toFixed(0)} KB
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Add More Photos Button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="mt-4 w-full py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-[#006699] dark:hover:border-[#006699] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-200 flex items-center justify-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-[#006699] dark:hover:text-[#006699]"
+          >
+            <Plus className="h-5 w-5" />
+            <span className="font-medium">Add More Photos</span>
+          </button>
+        </div>
+      )}
+
+      {/* Tips */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <h5 className="font-semibold text-blue-900 dark:text-blue-300 mb-2 flex items-center">
+          <ImageIcon className="h-5 w-5 mr-2" />
+          Photo Tips
+        </h5>
+        <ul className="space-y-1 text-sm text-blue-800 dark:text-blue-400">
+          <li>• Use high-resolution photos (at least 1024x683 pixels)</li>
+          <li>• Capture different rooms and angles</li>
+          <li>• Take photos in good lighting (daytime preferred)</li>
+          <li>• Show special features and amenities</li>
+          <li>• Keep photos recent and accurate</li>
+        </ul>
+      </div>
+    </div>
+  );
+
   const renderHouseRulesStep = () => (
     <div className="space-y-6">
       <div className="text-center">
@@ -695,6 +1077,9 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
             <p><strong>Type:</strong> {formData.type} • {formData.propertyType}</p>
             <p><strong>Capacity:</strong> {formData.capacity?.guests} guests, {formData.capacity?.bedrooms} bedrooms, {formData.capacity?.bathrooms} bathrooms</p>
             <p><strong>Location:</strong> {formData.location?.address}, {formData.location?.city}, {formData.location?.emirate}</p>
+            {formData.location?.lat !== 0 && formData.location?.lng !== 0 && (
+              <p><strong>Coordinates:</strong> {formData.location?.lat.toFixed(6)}°, {formData.location?.lng.toFixed(6)}°</p>
+            )}
           </div>
         </div>
 
@@ -723,6 +1108,32 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
         </div>
 
         <div>
+          <h4 className="font-medium text-gray-900 dark:text-white mb-2">Photos ({uploadedPhotos.length})</h4>
+          {uploadedPhotos.length > 0 ? (
+            <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+              {uploadedPhotos.slice(0, 8).map((photo, index) => (
+                <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700">
+                  <img src={photo.url} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
+                  {photo.isPrimary && (
+                    <div className="absolute top-1 left-1 bg-[#006699] text-white px-1.5 py-0.5 rounded text-xs flex items-center space-x-1">
+                      <Star className="h-2 w-2 fill-current" />
+                      <span>Cover</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {uploadedPhotos.length > 8 && (
+                <div className="aspect-square rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">+{uploadedPhotos.length - 8} more</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 dark:text-gray-400">No photos uploaded</p>
+          )}
+        </div>
+
+        <div>
           <h4 className="font-medium text-gray-900 dark:text-white mb-2">House Rules ({formData.houseRules?.length || 0})</h4>
           <div className="space-y-1">
             {formData.houseRules?.map((rule, index) => (
@@ -744,6 +1155,8 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
         return renderCapacityStep();
       case 'amenities':
         return renderAmenitiesStep();
+      case 'photos':
+        return renderPhotosStep();
       case 'houseRules':
         return renderHouseRulesStep();
       case 'pricing':
@@ -760,59 +1173,125 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
     { id: 'location', name: 'Location', icon: MapPin },
     { id: 'capacity', name: 'Capacity', icon: Users },
     { id: 'amenities', name: 'Amenities', icon: Shield },
+    { id: 'photos', name: 'Photos', icon: Camera },
     { id: 'houseRules', name: 'House Rules', icon: Shield },
     { id: 'pricing', name: 'Pricing', icon: DollarSign },
     { id: 'review', name: 'Review', icon: Eye }
   ];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-              Create New Property Listing
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              Add your property to start hosting guests
-            </p>
+        {/* Header - Enhanced */}
+        <div className="bg-gradient-to-r from-[#006699] to-[#0088cc] rounded-2xl shadow-lg p-8 relative overflow-hidden">
+          {/* Background Pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute inset-0" style={{
+              backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+              backgroundSize: '40px 40px'
+            }} />
           </div>
-          <button
-            onClick={onCancel}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-          >
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
+          
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl">
+                <Home className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h2 className="text-3xl font-bold text-white mb-1">
+                  Create New Property Listing
+                </h2>
+                <p className="text-blue-100 flex items-center space-x-2">
+                  <span>Add your property to start hosting guests</span>
+                  <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-medium">
+                    Professional
+                  </span>
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onCancel}
+              className="p-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl transition-all duration-200 group"
+              title="Cancel"
+            >
+              <X className="h-6 w-6 text-white group-hover:rotate-90 transition-transform duration-200" />
+            </button>
+          </div>
         </div>
 
-        {/* Progress Indicator */}
-        <div className="flex items-center space-x-4">
-          {steps.map((stepItem, index) => (
-            <div key={stepItem.id} className="flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                step === stepItem.id
-                  ? 'bg-[#006699] text-white'
-                  : index < steps.indexOf(steps.find(s => s.id === step)!)
-                  ? 'bg-green-500 text-white'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-              }`}>
-                <stepItem.icon className="h-4 w-4" />
-              </div>
-              <span className={`ml-2 text-sm font-medium ${
-                step === stepItem.id ? 'text-[#006699]' : 'text-gray-500 dark:text-gray-400'
-              }`}>
-                {stepItem.name}
+        {/* Progress Indicator - Modern Design */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          {/* Progress Bar */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Step {steps.findIndex(s => s.id === step) + 1} of {steps.length}
               </span>
-              {index < steps.length - 1 && (
-                <div className={`w-8 h-1 mx-4 ${
-                  index < steps.indexOf(steps.find(s => s.id === step)!)
-                    ? 'bg-green-500'
-                    : 'bg-gray-200 dark:bg-gray-700'
-                }`} />
-              )}
+              <span className="text-sm font-medium text-[#006699] dark:text-blue-400">
+                {Math.round(((steps.findIndex(s => s.id === step) + 1) / steps.length) * 100)}% Complete
+              </span>
             </div>
-          ))}
+            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-[#006699] to-[#0088cc] transition-all duration-500 ease-out rounded-full"
+                style={{ width: `${((steps.findIndex(s => s.id === step) + 1) / steps.length) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Steps Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+            {steps.map((stepItem, index) => {
+              const currentStepIndex = steps.findIndex(s => s.id === step);
+              const isCompleted = index < currentStepIndex;
+              const isCurrent = step === stepItem.id;
+              const isUpcoming = index > currentStepIndex;
+
+              return (
+                <div key={stepItem.id} className="flex flex-col items-center">
+                  {/* Step Circle */}
+                  <div className={`
+                    relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300
+                    ${isCurrent 
+                      ? 'bg-gradient-to-br from-[#006699] to-[#0088cc] shadow-lg shadow-[#006699]/30 scale-110' 
+                      : isCompleted
+                      ? 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-md'
+                      : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }
+                  `}>
+                    {isCompleted ? (
+                      <CheckCircle className="h-6 w-6 text-white" />
+                    ) : (
+                      <stepItem.icon className={`h-5 w-5 ${
+                        isCurrent ? 'text-white' : isUpcoming ? 'text-gray-400 dark:text-gray-500' : 'text-white'
+                      }`} />
+                    )}
+                    
+                    {/* Pulse animation for current step */}
+                    {isCurrent && (
+                      <span className="absolute inset-0 rounded-full bg-[#006699] animate-ping opacity-20" />
+                    )}
+                  </div>
+
+                  {/* Step Label */}
+                  <div className="mt-2 text-center">
+                    <p className={`text-xs font-medium transition-colors ${
+                      isCurrent 
+                        ? 'text-[#006699] dark:text-blue-400' 
+                        : isCompleted
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-gray-500 dark:text-gray-400'
+                    }`}>
+                      {stepItem.name}
+                    </p>
+                    {isCurrent && (
+                      <div className="mt-1 h-1 w-full bg-gradient-to-r from-[#006699] to-[#0088cc] rounded-full" />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Step Content */}
@@ -820,54 +1299,80 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
           {renderStepContent()}
         </div>
 
-        {/* Navigation Buttons */}
-        <div className="flex items-center justify-between pt-6">
-          <div>
-            {step !== 'basic' && (
-              <Button
-                variant="secondary"
-                onClick={handlePrevious}
+        {/* Navigation Buttons - Enhanced */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              {step !== 'basic' && (
+                <button
+                  onClick={handlePrevious}
+                  disabled={isLoading}
+                  className="flex items-center space-x-2 px-6 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-xl font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
+                >
+                  <svg className="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Previous Step</span>
+                </button>
+              )}
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={onCancel}
                 disabled={isLoading}
+                className="px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Previous
-              </Button>
-            )}
+                Cancel
+              </button>
+              
+              {step === 'review' ? (
+                <button
+                  onClick={handleSubmit}
+                  disabled={isLoading}
+                  className="flex items-center space-x-2 px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-green-500/30 hover:shadow-xl hover:shadow-green-500/40 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-5 w-5" />
+                      <span>Create Listing</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={handleNext}
+                  disabled={isLoading}
+                  className="flex items-center space-x-2 px-8 py-3 bg-gradient-to-r from-[#006699] to-[#0088cc] hover:from-[#005588] hover:to-[#0077bb] text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-[#006699]/30 hover:shadow-xl hover:shadow-[#006699]/40 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 group"
+                >
+                  <span>Continue</span>
+                  <svg className="h-5 w-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="secondary"
-              onClick={onCancel}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            {step === 'review' ? (
-              <Button
-                variant="primary"
-                onClick={handleSubmit}
-                disabled={isLoading}
-                className="flex items-center space-x-2"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                    <span>Creating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4" />
-                    <span>Create Listing</span>
-                  </>
-                )}
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                onClick={handleNext}
-              >
-                Continue
-              </Button>
-            )}
+
+          {/* Helper Text */}
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
+                <AlertCircle className="h-4 w-4" />
+                <span>Your progress is automatically saved</span>
+              </div>
+              
+              {step !== 'review' && (
+                <div className="text-gray-500 dark:text-gray-400">
+                  {steps.length - steps.findIndex(s => s.id === step) - 1} steps remaining
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -903,6 +1408,11 @@ const PropertyListingForm: React.FC<PropertyListingFormProps> = ({
                     handleNestedInputChange('location', 'address', location.address);
                     handleNestedInputChange('location', 'lat', location.lat);
                     handleNestedInputChange('location', 'lng', location.lng);
+                    // Extract city from address if available
+                    const addressParts = location.address.split(',');
+                    if (addressParts.length > 1) {
+                      handleNestedInputChange('location', 'city', addressParts[addressParts.length - 2].trim());
+                    }
                     setShowMapPopup(false);
                   }}
                   initialCenter={{ lat: 25.1932, lng: 55.4144 }}

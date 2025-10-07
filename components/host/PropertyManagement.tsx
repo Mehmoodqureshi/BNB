@@ -252,7 +252,7 @@ const PropertyManagement: React.FC<PropertyManagementProps> = ({ hostId, onAddPr
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#006699] border-t-transparent mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Loading properties...</p>
@@ -262,7 +262,7 @@ const PropertyManagement: React.FC<PropertyManagementProps> = ({ hostId, onAddPr
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:bg-gray-900 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -327,7 +327,7 @@ const PropertyManagement: React.FC<PropertyManagementProps> = ({ hostId, onAddPr
                 {/* Actions Menu */}
                 <div className="absolute bottom-3 right-3">
                   <div className="relative">
-                    <button className="p-2 bg-white/90 dark:bg-gray-800/90 rounded-full hover:bg-white dark:hover:bg-gray-800 transition-colors">
+                    <button className="p-2 bg-white dark:bg-gray-800/90 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                       <MoreVertical className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                     </button>
                   </div>

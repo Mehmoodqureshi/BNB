@@ -74,7 +74,6 @@ const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, onProfileClick, on
   ];
 
   const quickActions = [
-    { label: 'Dashboard', icon: BarChart3, onClick: () => { onDashboardClick(); onClose(); } },
     { label: 'Messages', icon: MessageCircle, onClick: () => { window.location.href = '/messages'; onClose(); } },
     { label: 'Bookings', icon: Calendar, onClick: () => { window.location.href = '/bookings'; onClose(); } },
     { label: 'Wishlist', icon: Heart, onClick: () => { window.location.href = '/wishlist'; onClose(); } },
