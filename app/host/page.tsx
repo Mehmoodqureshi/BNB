@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/components/providers/AuthProvider';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useHostContext } from './layout';
 import HostDashboard from '@/components/host/HostDashboard';
 import PropertyListingForm from '@/components/host/PropertyListingForm';
 import { PropertyListing } from '@/lib/types/host';
@@ -10,7 +10,7 @@ import { X, Save, Bell, DollarSign, User } from 'lucide-react';
 import CalendarManagement from '@/components/host/CalendarManagement';
 
 const HostPage: React.FC = () => {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { hostUser, logout } = useHostContext();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showPropertyForm, setShowPropertyForm] = useState(false);
@@ -35,38 +35,6 @@ const HostPage: React.FC = () => {
       router.replace('/host');
     }
   }, [searchParams]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#006699] border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading host dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            Access Denied
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            You need to be logged in to access the host dashboard.
-          </p>
-          <a
-            href="/test-auth"
-            className="inline-flex items-center px-4 py-2 bg-[#006699] text-white rounded-lg hover:bg-[#005588] transition-colors"
-          >
-            Go to Login
-          </a>
-        </div>
-      </div>
-    );
-  }
 
   const handleCreateProperty = async (property: PropertyListing) => {
     try {
@@ -137,7 +105,7 @@ const HostPage: React.FC = () => {
   return (
     <>
       <HostDashboard 
-        hostId={user.id}
+        hostId={hostUser?.id || ''}
         onAddProperty={handleAddProperty}
         onManageCalendar={handleManageCalendar}
         onViewMessages={handleViewMessages}
@@ -190,7 +158,7 @@ const HostPage: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
                       <input
                         type="text"
-                        defaultValue={user ? `${user.firstName} ${user.lastName}` : ''}
+                        defaultValue={hostUser?.name || ''}
                         className="w-full px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent text-gray-900 dark:text-white"
                       />
                     </div>
@@ -198,7 +166,7 @@ const HostPage: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
                       <input
                         type="email"
-                        defaultValue={user?.email || ''}
+                        defaultValue={hostUser?.email || ''}
                         className="w-full px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent text-gray-900 dark:text-white"
                       />
                     </div>

@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, LogOut, Shield, AlertTriangle, Info, CheckCircle, X } from 'lucide-react';
+import { Bell, LogOut, Shield, AlertTriangle, Info, CheckCircle, X, Plus, Home } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAdminContext } from '@/app/admin/layout';
 
 interface AdminHeaderProps {
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
+  onAddProperty?: () => void;
 }
 
 interface Notification {
@@ -20,11 +22,13 @@ interface Notification {
   createdAt: string;
 }
 
-const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, actions }) => {
+const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, actions, onAddProperty }) => {
   const router = useRouter();
-  const adminEmail = typeof window !== 'undefined' ? localStorage.getItem('adminEmail') : null;
+  const { adminUser, logout } = useAdminContext();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Mock notifications - in real app, would come from API/context
   const [notifications, setNotifications] = useState<Notification[]>([
@@ -69,9 +73,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, actions }) =
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const handleLogout = () => {
-    localStorage.removeItem('isAdmin');
-    localStorage.removeItem('adminEmail');
-    router.push('/admin/login');
+    logout();
   };
 
   const markAsRead = (id: string) => {
@@ -120,22 +122,25 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, actions }) =
     return `${diffInDays}d ago`;
   };
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
       }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
     };
 
-    if (showNotifications) {
+    if (showNotifications || showUserMenu) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showNotifications]);
+  }, [showNotifications, showUserMenu]);
 
   return (
     <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-8 py-6">
@@ -149,15 +154,62 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, actions }) =
         <div className="flex items-center space-x-4">
           {actions}
           
-          {/* Admin Info */}
-          <div className="flex items-center space-x-3 px-4 py-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <div className="p-1.5 bg-[#006699] rounded-full">
-              <Shield className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Logged in as</p>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">{adminEmail || 'Admin'}</p>
-            </div>
+          {/* Add Property Button */}
+          {onAddProperty && (
+            <button
+              onClick={onAddProperty}
+              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-[#006699] to-[#0088cc] hover:from-[#005588] hover:to-[#0077bb] text-white rounded-lg transition-all shadow-md hover:shadow-lg transform hover:scale-105"
+            >
+              <Plus className="h-5 w-5" />
+              <span className="font-medium">Add Property</span>
+            </button>
+          )}
+          
+          {/* Admin Info with Menu */}
+          <div className="relative" ref={userMenuRef}>
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center space-x-3 px-4 py-2 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors cursor-pointer"
+            >
+              <div className="p-1.5 bg-[#006699] rounded-full">
+                <Shield className="h-4 w-4 text-white" />
+              </div>
+              <div className="text-left">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Agency Account</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">{adminUser?.name || 'Admin'}</p>
+              </div>
+              <svg
+                className={`h-4 w-4 text-gray-500 transition-transform ${showUserMenu ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {/* User Menu Dropdown */}
+            {showUserMenu && (
+              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+                <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{adminUser?.name || 'Admin'}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{adminUser?.email}</p>
+                  <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium bg-[#006699] text-white rounded-full">
+                    Agency
+                  </span>
+                </div>
+                
+                <div className="p-2">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center space-x-3 px-3 py-2 text-left text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span className="text-sm font-medium">Logout</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notifications */}
@@ -270,15 +322,6 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, actions }) =
               </div>
             )}
           </div>
-
-          {/* Logout */}
-          <button 
-            onClick={handleLogout}
-            className="flex items-center space-x-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="text-sm font-medium">Logout</span>
-          </button>
         </div>
       </div>
     </div>

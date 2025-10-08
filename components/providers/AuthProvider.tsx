@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { login as apiLogin, logout as apiLogout, getCurrentUser, tokenStorage, type AuthCredentials } from '@/lib/auth/authService';
 
 export interface User {
   id: string;
@@ -86,58 +87,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const userData = localStorage.getItem('user_data');
+      const currentUser = getCurrentUser();
       
-      if (token && userData) {
-        // Load user data from localStorage
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-        console.log('✅ User loaded from localStorage:', parsedUser);
-      } else {
-        console.log('ℹ️ No user session found');
-      }
-    } catch (error) {
-      console.error('❌ Auth check failed:', error);
-      // Clear invalid data
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user_data');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Test credentials for demo
-      if (email === 'test@example.com' && password === 'password123') {
-        const mockUser: User = {
-          id: '1',
-          email,
-          firstName: 'John',
-          lastName: 'Doe',
-          profilePicture: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-          phoneNumber: '+971501234567',
-          dateOfBirth: '1990-01-01',
-          isEmailVerified: true,
-          isPhoneVerified: true,
-          emirateID: true,
-          joinedDate: '2020-03-15',
-          responseRate: 100,
-          responseTime: 'within an hour',
-          isSuperhost: true,
-          languages: ['English', 'Arabic'],
-          bio: 'Passionate traveler and host. Love meeting new people and sharing local experiences.',
-          work: 'Software Engineer',
-          location: 'Dubai, UAE',
-          socialMedia: {
-            instagram: '@johndoe',
-            linkedin: 'linkedin.com/in/johndoe'
-          },
+      if (currentUser && currentUser.role === 'bnbuser') {
+        // Convert auth user to full user object
+        const fullUser: User = {
+          id: currentUser.id,
+          email: currentUser.email,
+          firstName: currentUser.name.split(' ')[0] || '',
+          lastName: currentUser.name.split(' ').slice(1).join(' ') || '',
+          isEmailVerified: false,
+          isPhoneVerified: false,
+          emirateID: false,
+          joinedDate: new Date().toISOString(),
+          isSuperhost: false,
+          languages: ['English'],
           preferences: {
             currency: 'AED',
             language: 'en',
@@ -148,20 +112,68 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           },
           stats: {
-            totalBookings: 45,
-            totalReviews: 38,
-            averageRating: 4.9,
-            yearsHosting: 3
+            totalBookings: 0,
+            totalReviews: 0,
+            averageRating: 0,
+            yearsHosting: 0
           }
         };
         
-        setUser(mockUser);
-        localStorage.setItem('auth_token', 'mock_token_123');
-        localStorage.setItem('user_data', JSON.stringify(mockUser));
-        console.log('✅ Login successful!', mockUser);
+        setUser(fullUser);
+        console.log('✅ User loaded from token:', currentUser);
       } else {
-        throw new Error('Invalid credentials. Use test@example.com / password123');
+        console.log('ℹ️ No user session found');
       }
+    } catch (error) {
+      console.error('❌ Auth check failed:', error);
+      tokenStorage.remove();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      // Call unified auth service
+      const response = await apiLogin({ email, password });
+      
+      // Check if user has bnbuser role
+      if (response.role !== 'bnbuser') {
+        throw new Error('Invalid account type. Please use the appropriate login page.');
+      }
+      
+      // Convert to User object
+      const fullUser: User = {
+        id: response.id.toString(),
+        email: response.email,
+        firstName: response.name.split(' ')[0] || '',
+        lastName: response.name.split(' ').slice(1).join(' ') || '',
+        isEmailVerified: response.isActive,
+        isPhoneVerified: false,
+        emirateID: false,
+        joinedDate: new Date().toISOString(),
+        isSuperhost: false,
+        languages: ['English'],
+        preferences: {
+          currency: 'AED',
+          language: 'en',
+          notifications: {
+            email: true,
+            sms: true,
+            push: true
+          }
+        },
+        stats: {
+          totalBookings: 0,
+          totalReviews: 0,
+          averageRating: 0,
+          yearsHosting: 0
+        }
+      };
+      
+      setUser(fullUser);
+      console.log('✅ User login successful!', fullUser);
     } catch (error) {
       console.error('❌ Login failed:', error);
       throw error;
@@ -186,9 +198,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
+    apiLogout();
     setUser(null);
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_data');
     console.log('✅ User logged out successfully');
   };
 

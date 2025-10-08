@@ -9,8 +9,10 @@ import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { PropertyManagementRecord } from '@/lib/types/admin';
 import Button from '@/components/ui/Button';
+import { useAdminContext } from '../layout';
 
 const AdminPropertiesPage: React.FC = () => {
+  const { showAddPropertyModal } = useAdminContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending_approval' | 'approved' | 'rejected'>('pending_approval');
   const [selectedProperty, setSelectedProperty] = useState<PropertyManagementRecord | null>(null);
@@ -145,6 +147,7 @@ const AdminPropertiesPage: React.FC = () => {
         <AdminHeader 
           title="Property Management" 
           subtitle="Review and approve property listings"
+          onAddProperty={showAddPropertyModal}
         />
 
         <div className="p-8 space-y-6">

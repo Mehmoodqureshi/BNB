@@ -4,6 +4,7 @@ import './globals.css'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { FilterProvider } from '@/components/providers/FilterProvider'
 import { AuthProvider } from '@/components/providers/AuthProvider'
+import QueryProvider from '@/components/providers/QueryProvider'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -64,13 +65,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
         <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning>
-          <ThemeProvider>
-            <AuthProvider>
-              <FilterProvider>
-                {children}
-              </FilterProvider>
-            </AuthProvider>
-          </ThemeProvider>
+          <QueryProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                <FilterProvider>
+                  {children}
+                </FilterProvider>
+              </AuthProvider>
+            </ThemeProvider>
+          </QueryProvider>
         </body>
     </html>
   )

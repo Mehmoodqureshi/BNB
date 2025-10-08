@@ -9,8 +9,10 @@ import {
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { PlatformStats, AdminAlert } from '@/lib/types/admin';
+import { useAdminContext } from './layout';
 
 const AdminDashboardPage: React.FC = () => {
+  const { showAddPropertyModal } = useAdminContext();
   // Mock platform stats
   const [stats] = useState<PlatformStats>({
     overview: {
@@ -96,6 +98,7 @@ const AdminDashboardPage: React.FC = () => {
         <AdminHeader 
           title="Dashboard Overview" 
           subtitle="Platform performance and key metrics"
+          onAddProperty={showAddPropertyModal}
         />
 
         <div className="p-8 space-y-8">
