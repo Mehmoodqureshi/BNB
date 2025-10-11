@@ -5,7 +5,7 @@
 
 import { adminToken, hostToken } from '@/lib/utils/tokenStorage';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://stagingbackend.dalile.com';
+const API_URL = process.env.NEXT_PUBLIC_END_POINT || 'https://stagingbackend.dalile.com';
 
 export type UserType = 'admin' | 'host' | 'guest';
 

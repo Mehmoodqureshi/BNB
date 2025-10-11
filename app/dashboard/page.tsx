@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useUserProfile } from '@/lib/auth/authService';
 import { useRouter } from 'next/navigation';
 import { 
   User, Settings, Calendar, MessageSquare, Heart, Star, Shield, Camera, 
@@ -12,14 +13,16 @@ import UserProfileModal from '@/components/auth/UserProfileModal';
 import RefundCalculatorModal from '@/components/payments/RefundCalculatorModal';
 
 const DashboardPage: React.FC = () => {
-  const { user, isAuthenticated, isLoading, uploadProfilePicture } = useAuth();
+  const { user: localUser, isAuthenticated, isLoading: authLoading, uploadProfilePicture } = useAuth();
+  const { data: profileData, isLoading: profileLoading, error: profileError, refetch } = useUserProfile();
   const router = useRouter();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [showRefundModal, setShowRefundModal] = useState(false);
 
-  if (isLoading) {
+  // Loading state
+  if (authLoading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
         <div className="text-center">
@@ -30,10 +33,44 @@ const DashboardPage: React.FC = () => {
     );
   }
 
-  if (!isAuthenticated || !user) {
-    router.push('/test-auth');
+  if (profileError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
+        <div className="text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Failed to load profile</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">{(profileError as Error).message}</p>
+          <button
+            onClick={() => refetch()}
+            className="px-6 py-2 bg-[#006699] text-white rounded-lg hover:bg-[#005588] transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !localUser) {
+    router.push('/');
     return null;
   }
+
+  // Merge local user data with API profile data
+  const user = profileData ? {
+    ...localUser,
+    ...profileData,
+    // Ensure proper structure
+    firstName: profileData.firstName || profileData.name?.split(' ')[0] || localUser.firstName || '',
+    lastName: profileData.lastName || profileData.name?.split(' ').slice(1).join(' ') || localUser.lastName || '',
+    stats: profileData.stats || localUser.stats || {
+      totalBookings: 0,
+      totalReviews: 0,
+      averageRating: 0,
+      yearsHosting: 0
+    },
+    profilePicture: profileData.profilePicture || localUser.profilePicture || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face'
+  } : localUser;
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -244,17 +281,6 @@ const DashboardPage: React.FC = () => {
                     <span>Edit Profile</span>
                   </button>
                   
-                  <label className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-pointer">
-                    <Camera className="h-4 w-4" />
-                    <span>{isUploading ? 'Uploading...' : 'Upload Photo'}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePhotoUpload}
-                      className="hidden"
-                      disabled={isUploading}
-                    />
-                  </label>
                 </div>
               </div>
             </div>

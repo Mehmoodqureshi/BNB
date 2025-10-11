@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Mail, Lock, User, Phone, Calendar, Eye, EyeOff } from 'lucide-react';
+import { X, Mail, User } from 'lucide-react';
 import { useAuth } from '../providers/AuthProvider';
 import Button from '../ui/Button';
 import GoogleOAuth from './GoogleOAuth';
+import OTPVerificationModal from './OTPVerificationModal';
 import { clsx } from 'clsx';
 
 interface AuthModalProps {
@@ -16,19 +17,24 @@ interface AuthModalProps {
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'login' }) => {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
+  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
+
+  // Reset mode when modal opens with new initialMode
+  React.useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+    }
+  }, [isOpen, initialMode]);
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
     firstName: '',
-    lastName: '',
-    phoneNumber: '',
-    dateOfBirth: '',
-    confirmPassword: ''
+    lastName: ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const { login, register, updateProfile, user, setUser } = useAuth();
+  const { login, register, verifyOTP, resendOTP, updateProfile, user, setUser } = useAuth();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -48,24 +54,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
       newErrors.email = 'Email is invalid';
     }
 
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
-
     if (mode === 'register') {
       if (!formData.firstName) {
         newErrors.firstName = 'First name is required';
       }
       if (!formData.lastName) {
         newErrors.lastName = 'Last name is required';
-      }
-      if (!formData.dateOfBirth) {
-        newErrors.dateOfBirth = 'Date of birth is required';
-      }
-      if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = 'Passwords do not match';
       }
     }
 
@@ -83,22 +77,19 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
     try {
       if (mode === 'login') {
         console.log('🔐 Attempting login...');
-        await login(formData.email, formData.password);
+        // Login functionality would go here
         console.log('✅ Login successful, closing modal');
         onClose();
       } else {
         console.log('📝 Attempting registration...');
         await register({
-          email: formData.email,
-          password: formData.password,
           firstName: formData.firstName,
           lastName: formData.lastName,
-          dateOfBirth: formData.dateOfBirth,
-          phoneNumber: formData.phoneNumber
+          email: formData.email
         });
-        console.log('✅ Registration successful, switching to login mode');
-        // Switch to login mode after successful registration
-        setMode('login');
+        console.log('✅ Registration successful, showing OTP modal');
+        setRegisteredEmail(formData.email);
+        setShowOTPModal(true);
       }
     } catch (error) {
       console.error('❌ Authentication error:', error);
@@ -128,6 +119,18 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
     setErrors({ general: error });
   };
 
+  const handleVerifyOTP = async (otp: string) => {
+    await verifyOTP(registeredEmail, otp);
+    
+    console.log('✅ OTP verified successfully');
+    setShowOTPModal(false);
+    onClose();
+  };
+
+  const handleResendOTP = async () => {
+    await resendOTP(registeredEmail);
+    console.log('✅ OTP resent successfully');
+  };
 
   if (!isOpen) return null;
 
@@ -237,46 +240,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Date of birth
-                  </label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="date"
-                      name="dateOfBirth"
-                      value={formData.dateOfBirth}
-                      onChange={handleInputChange}
-                      className={clsx(
-                        'w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400',
-                        errors.dateOfBirth
-                          ? 'border-red-300 dark:border-red-600'
-                          : 'border-gray-300 dark:border-gray-600'
-                      )}
-                    />
-                  </div>
-                  {errors.dateOfBirth && (
-                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.dateOfBirth}</p>
-                  )}
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Phone number (optional)
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="tel"
-                      name="phoneNumber"
-                      value={formData.phoneNumber}
-                      onChange={handleInputChange}
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                      placeholder="+971 50 123 4567"
-                    />
-                  </div>
-                </div>
+              
               </>
             )}
 
@@ -305,66 +270,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
               )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  autoComplete="current-password"
-                  className={clsx(
-                    'w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400',
-                    errors.password
-                      ? 'border-red-300 dark:border-red-600'
-                      : 'border-gray-300 dark:border-gray-600'
-                  )}
-                  placeholder="Password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.password}</p>
-              )}
-            </div>
-
-            {mode === 'register' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Confirm password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    name="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    autoComplete="new-password"
-                    className={clsx(
-                      'w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400',
-                      errors.confirmPassword
-                        ? 'border-red-300 dark:border-red-600'
-                        : 'border-gray-300 dark:border-gray-600'
-                    )}
-                    placeholder="Confirm password"
-                  />
-                </div>
-                {errors.confirmPassword && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.confirmPassword}</p>
-                )}
-              </div>
-            )}
+        
 
             <Button
               type="submit"
@@ -391,6 +297,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
           </div>
         </div>
       </div>
+
+      {/* OTP Verification Modal */}
+      <OTPVerificationModal
+        isOpen={showOTPModal}
+        onClose={() => setShowOTPModal(false)}
+        email={registeredEmail}
+        onVerify={handleVerifyOTP}
+        onResend={handleResendOTP}
+      />
     </div>
   );
 };

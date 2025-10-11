@@ -6,7 +6,7 @@
 import { adminToken } from '@/lib/utils/tokenStorage';
 
 // Your backend API URL
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://stagingbackend.dalile.com';
+const API_URL = process.env.NEXT_PUBLIC_END_POINT;
 
 // Types
 export interface AdminLoginRequest {

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { login as apiLogin, logout as apiLogout, getCurrentUser, tokenStorage, type AuthCredentials } from '@/lib/auth/authService';
+import { login as apiLogin, logout as apiLogout, getCurrentUser, tokenStorage, type AuthCredentials, useRegister as useRegisterMutation, useVerifyOTP as useVerifyOTPMutation, useResendOTP as useResendOTPMutation } from '@/lib/auth/authService';
 
 export interface User {
   id: string;
@@ -52,6 +52,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
+  verifyOTP: (email: string, otp: string) => Promise<void>;
+  resendOTP: (email: string) => Promise<void>;
   logout: () => void;
   updateProfile: (userData: Partial<User>) => Promise<void>;
   uploadProfilePicture: (file: File) => Promise<string>;
@@ -62,12 +64,9 @@ interface AuthContextType {
 }
 
 interface RegisterData {
-  email: string;
-  password: string;
   firstName: string;
   lastName: string;
-  dateOfBirth: string;
-  phoneNumber?: string;
+  email: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -80,6 +79,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // TanStack Query hooks
+  const registerMutation = useRegisterMutation();
+  const verifyOTPMutation = useVerifyOTPMutation();
+  const resendOTPMutation = useResendOTPMutation();
+
   useEffect(() => {
     // Check for existing session on mount
     checkAuthStatus();
@@ -87,16 +91,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
+      const token = tokenStorage.get();
+      
+      if (!token) {
+        console.log('ℹ️ No token found in localStorage');
+        setIsLoading(false);
+        return;
+      }
+      
       const currentUser = getCurrentUser();
       
-      if (currentUser && currentUser.role === 'bnbuser') {
+      if (!currentUser) {
+        console.log('🔴 Invalid or expired token, removing...');
+        tokenStorage.remove();
+        setIsLoading(false);
+        return;
+      }
+      
+      if (currentUser.role === 'bnbuser') {
         // Convert auth user to full user object
+        const nameParts = currentUser.name.split(' ');
         const fullUser: User = {
           id: currentUser.id,
           email: currentUser.email,
-          firstName: currentUser.name.split(' ')[0] || '',
-          lastName: currentUser.name.split(' ').slice(1).join(' ') || '',
-          isEmailVerified: false,
+          firstName: nameParts[0] || '',
+          lastName: nameParts.slice(1).join(' ') || '',
+          isEmailVerified: true,
           isPhoneVerified: false,
           emirateID: false,
           joinedDate: new Date().toISOString(),
@@ -120,9 +140,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
         
         setUser(fullUser);
-        console.log('✅ User loaded from token:', currentUser);
+        console.log('✅ User auto-logged in from stored token');
+        console.log('👤 User:', currentUser.name, '(' + currentUser.email + ')');
       } else {
-        console.log('ℹ️ No user session found');
+        console.log('ℹ️ Token exists but wrong role:', currentUser.role);
+        tokenStorage.remove();
       }
     } catch (error) {
       console.error('❌ Auth check failed:', error);
@@ -143,13 +165,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Invalid account type. Please use the appropriate login page.');
       }
       
+      // Safely extract name parts
+      const name = response.name || '';
+      const nameParts = name.trim().split(' ');
+      
       // Convert to User object
       const fullUser: User = {
-        id: response.id.toString(),
-        email: response.email,
-        firstName: response.name.split(' ')[0] || '',
-        lastName: response.name.split(' ').slice(1).join(' ') || '',
-        isEmailVerified: response.isActive,
+        id: response.id?.toString() || 'unknown',
+        email: response.email || email,
+        firstName: nameParts[0] || '',
+        lastName: nameParts.slice(1).join(' ') || '',
+        isEmailVerified: response.isActive || false,
         isPhoneVerified: false,
         emirateID: false,
         joinedDate: new Date().toISOString(),
@@ -185,15 +211,67 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 
   const register = async (userData: RegisterData) => {
-    setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('Register with:', userData);
+      const response = await registerMutation.mutateAsync(userData);
+      console.log('✅ Registration successful!', response);
+      // Don't store token yet, wait for OTP verification
     } catch (error) {
-      throw new Error('Registration failed');
-    } finally {
-      setIsLoading(false);
+      console.error('❌ Registration failed:', error);
+      throw error;
+    }
+  };
+
+  const verifyOTP = async (email: string, otp: string) => {
+    try {
+      // Call the OTP verification API using TanStack Query
+      const response = await verifyOTPMutation.mutateAsync({ email, otp });
+      
+      // Set user data from response
+      if (response.user) {
+        const nameParts = response.user.name.split(' ');
+        const fullUser: User = {
+          id: response.user.id.toString(),
+          email: response.user.email,
+          firstName: nameParts[0] || '',
+          lastName: nameParts.slice(1).join(' ') || '',
+          isEmailVerified: true,
+          isPhoneVerified: false,
+          emirateID: false,
+          joinedDate: new Date().toISOString(),
+          isSuperhost: false,
+          languages: ['English'],
+          preferences: {
+            currency: 'AED',
+            language: 'en',
+            notifications: {
+              email: true,
+              sms: true,
+              push: true
+            }
+          },
+          stats: {
+            totalBookings: 0,
+            totalReviews: 0,
+            averageRating: 0,
+            yearsHosting: 0
+          }
+        };
+        setUser(fullUser);
+        console.log('✅ User logged in:', fullUser);
+      }
+    } catch (error) {
+      console.error('❌ OTP verification failed:', error);
+      throw error;
+    }
+  };
+
+  const resendOTP = async (email: string) => {
+    try {
+      await resendOTPMutation.mutateAsync(email);
+      console.log('✅ OTP resent successfully');
+    } catch (error) {
+      console.error('❌ Failed to resend OTP:', error);
+      throw error;
     }
   };
 
@@ -282,6 +360,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated: !!user,
     login,
     register,
+    verifyOTP,
+    resendOTP,
     logout,
     updateProfile,
     uploadProfilePicture,

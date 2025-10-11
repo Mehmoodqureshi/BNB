@@ -6,7 +6,7 @@
 import { hostToken } from '@/lib/utils/tokenStorage';
 
 // Your backend API URL
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://stagingbackend.dalile.com';
+const API_URL = process.env.NEXT_PUBLIC_END_POINT || 'https://stagingbackend.dalile.com';
 
 // Types
 export interface HostLoginRequest {
