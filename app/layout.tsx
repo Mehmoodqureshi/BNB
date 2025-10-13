@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { FilterProvider } from '@/components/providers/FilterProvider'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import QueryProvider from '@/components/providers/QueryProvider'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -69,7 +70,9 @@ export default function RootLayout({
             <ThemeProvider>
               <AuthProvider>
                 <FilterProvider>
-                  {children}
+                <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}>
+              {children}
+        </GoogleOAuthProvider>
                 </FilterProvider>
               </AuthProvider>
             </ThemeProvider>

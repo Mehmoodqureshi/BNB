@@ -5,7 +5,7 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-const API_URL = process.env.NEXT_PUBLIC_END_POINT;
+const API_URL = process.env.NEXT_PUBLIC_END_POINT ;
 
 // Token storage keys
 const TOKEN_KEY = 'bnbuser';
@@ -257,14 +257,73 @@ export const getUserProfile = async (): Promise<any> => {
     throw new Error(error.message || 'Failed to fetch profile');
   }
 
+  const result = await response.json();
+  console.log('🟢 Profile fetched successfully:', result);
+  
+  // Return the data object from the response
+  return result.data || result;
+};
+
+/**
+ * Update user profile data with FormData (supports firstName, lastName, avatar file)
+ */
+export interface UpdateProfileData {
+  firstName?: string;
+  lastName?: string;
+  avatar?: File;
+}
+
+export const updateProfile = async (profileData: UpdateProfileData): Promise<any> => {
+  const token = tokenStorage.get();
+  
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  console.log('🔵 Update Profile Request:', `${API_URL}/bnb-users/updateProfile`);
+  console.log('📝 Data:', profileData);
+
+  // Create FormData
+  const formData = new FormData();
+  
+  if (profileData.firstName) {
+    formData.append('firstName', profileData.firstName);
+  }
+  if (profileData.lastName) {
+    formData.append('lastName', profileData.lastName);
+  }
+  if (profileData.avatar) {
+    formData.append('avatar', profileData.avatar);
+  }
+
+  const response = await fetch(`${API_URL}/bnb-users/updateProfile`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  console.log('🔵 Response Status:', response.status);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      tokenStorage.remove();
+      throw new Error('Session expired. Please login again.');
+    }
+    const error = await response.json();
+    console.log('🔴 Error:', error);
+    throw new Error(error.message || 'Failed to update profile');
+  }
+
   const data = await response.json();
-  console.log('🟢 Profile fetched successfully:', data);
+  console.log('🟢 Profile updated successfully:', data);
   
   return data;
 };
 
 /**
- * Login API call
+ * Login API call (for admin/agent with password)
  */
 export const login = async (credentials: AuthCredentials): Promise<AuthResponse> => {
   console.log('🔵 Auth Request:', `${API_URL}/auth/login`);
@@ -288,6 +347,35 @@ export const login = async (credentials: AuthCredentials): Promise<AuthResponse>
 
   const data: AuthResponse = await response.json();
   console.log('🟢 Success:', { role: data.role, email: data.email });
+
+  return data;
+};
+
+/**
+ * Login API call for BNB users (passwordless, sends OTP)
+ */
+export const loginBnbUser = async (email: string): Promise<AuthResponse> => {
+  console.log('🔵 BNB User Login Request:', `${API_URL}/bnb-users/login`);
+  console.log('📧 Email:', email);
+
+  const response = await fetch(`${API_URL}/bnb-users/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  console.log('🔵 Response Status:', response.status);
+
+  if (!response.ok) {
+    const error = await response.json();
+    console.log('🔴 Error:', error);
+    throw new Error(error.message || 'Login failed');
+  }
+
+  const data: AuthResponse = await response.json();
+  console.log('🟢 BNB User Login Success - OTP sent to:', email);
 
   return data;
 };
@@ -381,7 +469,7 @@ export const useResendOTP = () => {
 };
 
 /**
- * Hook for login mutation
+ * Hook for login mutation (admin/agent)
  */
 export const useLogin = () => {
   return useMutation({
@@ -401,6 +489,21 @@ export const useLogin = () => {
 };
 
 /**
+ * Hook for BNB user login mutation (sends OTP)
+ */
+export const useLoginBnbUser = () => {
+  return useMutation({
+    mutationFn: loginBnbUser,
+    onSuccess: (data) => {
+      console.log('✅ OTP sent to email for login');
+    },
+    onError: (error: Error) => {
+      console.error('❌ BNB user login failed:', error.message);
+    },
+  });
+};
+
+/**
  * Hook for logout
  */
 export const useLogout = () => {
@@ -408,6 +511,88 @@ export const useLogout = () => {
     logout();
     window.location.href = '/';
   };
+};
+
+/**
+ * Google OAuth login API call
+ */
+export interface GoogleOAuthData {
+  credential: string;
+  googleId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  profilePicture?: string;
+}
+
+export const googleOAuthLogin = async (googleData: GoogleOAuthData): Promise<AuthResponse> => {
+  console.log('🔵 Google OAuth Login Request:', `${API_URL}/bnb-users/google-auth`);
+  console.log('📧 Email:', googleData.email);
+  console.log('🔑 Credential length:', googleData.credential?.length || 0);
+  console.log('👤 User data:', {
+    firstName: googleData.firstName,
+    lastName: googleData.lastName,
+    profilePicture: googleData.profilePicture ? 'Present' : 'Missing'
+  });
+
+  const requestBody = {
+    email: googleData.email,
+    name: `${googleData.firstName} ${googleData.lastName}`.trim(),
+    avatar: googleData.profilePicture,
+  };
+
+  console.log('📤 Request body:', requestBody);
+
+  const response = await fetch(`${API_URL}/bnb-users/google-auth`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  console.log('🔵 Response Status:', response.status);
+  console.log('🔵 Response Headers:', Object.fromEntries(response.headers.entries()));
+
+  if (!response.ok) {
+    let errorMessage = 'Google OAuth login failed';
+    try {
+      const error = await response.json();
+      console.log('🔴 Error response:', error);
+      errorMessage = error.message || error.error || errorMessage;
+    } catch (parseError) {
+      console.log('🔴 Could not parse error response:', parseError);
+      errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+    }
+    throw new Error(errorMessage);
+  }
+
+  const data: AuthResponse = await response.json();
+  console.log('🟢 Google OAuth Login Success:', data);
+
+  return data;
+};
+
+/**
+ * Hook for Google OAuth login mutation
+ */
+export const useGoogleOAuthLogin = () => {
+  return useMutation({
+    mutationFn: googleOAuthLogin,
+    onSuccess: (data) => {
+      console.log('📦 Google OAuth Response:', data);
+      // Store the token in localStorage as 'bnbuser'
+      const token = data.token || data.access_token;
+      if (token) {
+        tokenStorage.set(token);
+        console.log('✅ Token stored in localStorage as "bnbuser"');
+        console.log('🔐 Token expires in 30 days');
+      }
+    },
+    onError: (error: Error) => {
+      console.error('❌ Google OAuth login failed:', error.message);
+    },
+  });
 };
 
 /**

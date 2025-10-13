@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { login as apiLogin, logout as apiLogout, getCurrentUser, tokenStorage, type AuthCredentials, useRegister as useRegisterMutation, useVerifyOTP as useVerifyOTPMutation, useResendOTP as useResendOTPMutation } from '@/lib/auth/authService';
+import { logout as apiLogout, getCurrentUser, tokenStorage, useRegister as useRegisterMutation, useVerifyOTP as useVerifyOTPMutation, useResendOTP as useResendOTPMutation, useLoginBnbUser as useLoginBnbUserMutation, useGoogleOAuthLogin as useGoogleOAuthLoginMutation, updateProfile as apiUpdateProfile, getUserProfile as apiGetUserProfile, type UpdateProfileData, type GoogleOAuthData } from '@/lib/auth/authService';
 
 export interface User {
   id: string;
@@ -50,10 +50,11 @@ interface AuthContextType {
   setUser: (user: User | null) => void;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
   verifyOTP: (email: string, otp: string) => Promise<void>;
   resendOTP: (email: string) => Promise<void>;
+  googleOAuthLogin: (googleData: GoogleOAuthData) => Promise<void>;
   logout: () => void;
   updateProfile: (userData: Partial<User>) => Promise<void>;
   uploadProfilePicture: (file: File) => Promise<string>;
@@ -83,6 +84,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const registerMutation = useRegisterMutation();
   const verifyOTPMutation = useVerifyOTPMutation();
   const resendOTPMutation = useResendOTPMutation();
+  const loginBnbUserMutation = useLoginBnbUserMutation();
+  const googleOAuthLoginMutation = useGoogleOAuthLoginMutation();
 
   useEffect(() => {
     // Check for existing session on mount
@@ -109,39 +112,91 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       if (currentUser.role === 'bnbuser') {
-        // Convert auth user to full user object
-        const nameParts = currentUser.name.split(' ');
-        const fullUser: User = {
-          id: currentUser.id,
-          email: currentUser.email,
-          firstName: nameParts[0] || '',
-          lastName: nameParts.slice(1).join(' ') || '',
-          isEmailVerified: true,
-          isPhoneVerified: false,
-          emirateID: false,
-          joinedDate: new Date().toISOString(),
-          isSuperhost: false,
-          languages: ['English'],
-          preferences: {
-            currency: 'AED',
-            language: 'en',
-            notifications: {
-              email: true,
-              sms: true,
-              push: true
+        // Fetch full profile from API
+        try {
+          const profileData = await apiGetUserProfile();
+          
+          // Extract bnbUser data if it exists (nested structure)
+          const bnbUser = profileData.bnbUser || {};
+          
+          // Convert API response to User object
+          const nameParts = (profileData.name || currentUser.name).split(' ');
+          const fullUser: User = {
+            id: profileData.id?.toString() || currentUser.id,
+            email: profileData.email || currentUser.email,
+            firstName: bnbUser.firstName || profileData.firstName || nameParts[0] || '',
+            lastName: bnbUser.lastName || profileData.lastName || nameParts.slice(1).join(' ') || '',
+            profilePicture: profileData.avatar || bnbUser.avatar || profileData.profilePicture,
+            phoneNumber: bnbUser.phoneNumber || profileData.phoneNumber,
+            dateOfBirth: bnbUser.dateOfBirth || profileData.dateOfBirth,
+            isEmailVerified: bnbUser.isEmailVerified || profileData.isEmailVerified || true,
+            isPhoneVerified: bnbUser.isPhoneVerified || profileData.isPhoneVerified || false,
+            emirateID: bnbUser.emirateID || profileData.emirateID || false,
+            joinedDate: profileData.createdAt || bnbUser.joinedDate || profileData.joinedDate || new Date().toISOString(),
+            isSuperhost: bnbUser.isSuperhost || profileData.isSuperhost || false,
+            languages: bnbUser.languages || profileData.languages || ['English'],
+            bio: bnbUser.bio || profileData.bio,
+            work: bnbUser.work || profileData.work,
+            location: bnbUser.location || profileData.location,
+            socialMedia: bnbUser.socialMedia || profileData.socialMedia,
+            responseRate: bnbUser.responseRate || profileData.responseRate,
+            responseTime: bnbUser.responseTime || profileData.responseTime,
+            preferences: bnbUser.preferences || profileData.preferences || {
+              currency: 'AED',
+              language: 'en',
+              notifications: {
+                email: true,
+                sms: true,
+                push: true
+              }
+            },
+            stats: bnbUser.stats || profileData.stats || {
+              totalBookings: 0,
+              totalReviews: 0,
+              averageRating: 0,
+              yearsHosting: 0
             }
-          },
-          stats: {
-            totalBookings: 0,
-            totalReviews: 0,
-            averageRating: 0,
-            yearsHosting: 0
-          }
-        };
-        
-        setUser(fullUser);
-        console.log('✅ User auto-logged in from stored token');
-        console.log('👤 User:', currentUser.name, '(' + currentUser.email + ')');
+          };
+          
+          setUser(fullUser);
+          console.log('✅ User profile loaded from API');
+          console.log('👤 User:', fullUser.firstName, fullUser.lastName, '(' + fullUser.email + ')');
+        } catch (profileError) {
+          console.error('⚠️ Failed to fetch profile, using token data:', profileError);
+          
+          // Fallback to token data if profile fetch fails
+          const nameParts = currentUser.name.split(' ');
+          const fallbackUser: User = {
+            id: currentUser.id,
+            email: currentUser.email,
+            firstName: nameParts[0] || '',
+            lastName: nameParts.slice(1).join(' ') || '',
+            isEmailVerified: true,
+            isPhoneVerified: false,
+            emirateID: false,
+            joinedDate: new Date().toISOString(),
+            isSuperhost: false,
+            languages: ['English'],
+            preferences: {
+              currency: 'AED',
+              language: 'en',
+              notifications: {
+                email: true,
+                sms: true,
+                push: true
+              }
+            },
+            stats: {
+              totalBookings: 0,
+              totalReviews: 0,
+              averageRating: 0,
+              yearsHosting: 0
+            }
+          };
+          
+          setUser(fallbackUser);
+          console.log('✅ User auto-logged in from stored token (fallback)');
+        }
       } else {
         console.log('ℹ️ Token exists but wrong role:', currentUser.role);
         tokenStorage.remove();
@@ -154,57 +209,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
+  const login = async (email: string) => {
     try {
-      // Call unified auth service
-      const response = await apiLogin({ email, password });
-      
-      // Check if user has bnbuser role
-      if (response.role !== 'bnbuser') {
-        throw new Error('Invalid account type. Please use the appropriate login page.');
-      }
-      
-      // Safely extract name parts
-      const name = response.name || '';
-      const nameParts = name.trim().split(' ');
-      
-      // Convert to User object
-      const fullUser: User = {
-        id: response.id?.toString() || 'unknown',
-        email: response.email || email,
-        firstName: nameParts[0] || '',
-        lastName: nameParts.slice(1).join(' ') || '',
-        isEmailVerified: response.isActive || false,
-        isPhoneVerified: false,
-        emirateID: false,
-        joinedDate: new Date().toISOString(),
-        isSuperhost: false,
-        languages: ['English'],
-        preferences: {
-          currency: 'AED',
-          language: 'en',
-          notifications: {
-            email: true,
-            sms: true,
-            push: true
-          }
-        },
-        stats: {
-          totalBookings: 0,
-          totalReviews: 0,
-          averageRating: 0,
-          yearsHosting: 0
-        }
-      };
-      
-      setUser(fullUser);
-      console.log('✅ User login successful!', fullUser);
+      // Call BNB user login API (sends OTP)
+      const response = await loginBnbUserMutation.mutateAsync(email);
+      console.log('✅ Login OTP sent to email');
+      // Don't set user yet, wait for OTP verification
     } catch (error) {
       console.error('❌ Login failed:', error);
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -228,36 +241,89 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Set user data from response
       if (response.user) {
-        const nameParts = response.user.name.split(' ');
-        const fullUser: User = {
-          id: response.user.id.toString(),
-          email: response.user.email,
-          firstName: nameParts[0] || '',
-          lastName: nameParts.slice(1).join(' ') || '',
-          isEmailVerified: true,
-          isPhoneVerified: false,
-          emirateID: false,
-          joinedDate: new Date().toISOString(),
-          isSuperhost: false,
-          languages: ['English'],
-          preferences: {
-            currency: 'AED',
-            language: 'en',
-            notifications: {
-              email: true,
-              sms: true,
-              push: true
+        // Fetch full profile from API after successful OTP verification
+        try {
+          const profileData = await apiGetUserProfile();
+          
+          // Extract bnbUser data if it exists (nested structure)
+          const bnbUser = profileData.bnbUser || {};
+          
+          // Convert API response to User object
+          const nameParts = (profileData.name || response.user.name).split(' ');
+          const fullUser: User = {
+            id: profileData.id?.toString() || response.user.id.toString(),
+            email: profileData.email || response.user.email,
+            firstName: bnbUser.firstName || profileData.firstName || nameParts[0] || '',
+            lastName: bnbUser.lastName || profileData.lastName || nameParts.slice(1).join(' ') || '',
+            profilePicture: profileData.avatar || bnbUser.avatar || profileData.profilePicture,
+            phoneNumber: bnbUser.phoneNumber || profileData.phoneNumber,
+            dateOfBirth: bnbUser.dateOfBirth || profileData.dateOfBirth,
+            isEmailVerified: bnbUser.isEmailVerified || profileData.isEmailVerified || true,
+            isPhoneVerified: bnbUser.isPhoneVerified || profileData.isPhoneVerified || false,
+            emirateID: bnbUser.emirateID || profileData.emirateID || false,
+            joinedDate: profileData.createdAt || bnbUser.joinedDate || profileData.joinedDate || new Date().toISOString(),
+            isSuperhost: bnbUser.isSuperhost || profileData.isSuperhost || false,
+            languages: bnbUser.languages || profileData.languages || ['English'],
+            bio: bnbUser.bio || profileData.bio,
+            work: bnbUser.work || profileData.work,
+            location: bnbUser.location || profileData.location,
+            socialMedia: bnbUser.socialMedia || profileData.socialMedia,
+            responseRate: bnbUser.responseRate || profileData.responseRate,
+            responseTime: bnbUser.responseTime || profileData.responseTime,
+            preferences: bnbUser.preferences || profileData.preferences || {
+              currency: 'AED',
+              language: 'en',
+              notifications: {
+                email: true,
+                sms: true,
+                push: true
+              }
+            },
+            stats: bnbUser.stats || profileData.stats || {
+              totalBookings: 0,
+              totalReviews: 0,
+              averageRating: 0,
+              yearsHosting: 0
             }
-          },
-          stats: {
-            totalBookings: 0,
-            totalReviews: 0,
-            averageRating: 0,
-            yearsHosting: 0
-          }
-        };
-        setUser(fullUser);
-        console.log('✅ User logged in:', fullUser);
+          };
+          
+          setUser(fullUser);
+          console.log('✅ User profile loaded after OTP verification');
+        } catch (profileError) {
+          console.error('⚠️ Failed to fetch profile after OTP, using basic data:', profileError);
+          
+          // Fallback to basic user data if profile fetch fails
+          const nameParts = response.user.name.split(' ');
+          const fallbackUser: User = {
+            id: response.user.id.toString(),
+            email: response.user.email,
+            firstName: nameParts[0] || '',
+            lastName: nameParts.slice(1).join(' ') || '',
+            isEmailVerified: true,
+            isPhoneVerified: false,
+            emirateID: false,
+            joinedDate: new Date().toISOString(),
+            isSuperhost: false,
+            languages: ['English'],
+            preferences: {
+              currency: 'AED',
+              language: 'en',
+              notifications: {
+                email: true,
+                sms: true,
+                push: true
+              }
+            },
+            stats: {
+              totalBookings: 0,
+              totalReviews: 0,
+              averageRating: 0,
+              yearsHosting: 0
+            }
+          };
+          setUser(fallbackUser);
+          console.log('✅ User logged in with fallback data');
+        }
       }
     } catch (error) {
       console.error('❌ OTP verification failed:', error);
@@ -275,6 +341,107 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const googleOAuthLogin = async (googleData: GoogleOAuthData) => {
+    try {
+      console.log('🚀 Starting Google OAuth login...', googleData.email);
+      
+      // Call Google OAuth API
+      const response = await googleOAuthLoginMutation.mutateAsync(googleData);
+      
+      // Set user data from response
+      if (response.user) {
+        // Fetch full profile from API after successful Google OAuth
+        try {
+          const profileData = await apiGetUserProfile();
+          
+          // Extract bnbUser data if it exists (nested structure)
+          const bnbUser = profileData.bnbUser || {};
+          
+          // Convert API response to User object
+          const nameParts = (profileData.name || response.user.name).split(' ');
+          const fullUser: User = {
+            id: profileData.id?.toString() || response.user.id.toString(),
+            email: profileData.email || response.user.email,
+            firstName: bnbUser.firstName || profileData.firstName || nameParts[0] || '',
+            lastName: bnbUser.lastName || profileData.lastName || nameParts.slice(1).join(' ') || '',
+            profilePicture: profileData.avatar || bnbUser.avatar || profileData.profilePicture || googleData.profilePicture,
+            phoneNumber: bnbUser.phoneNumber || profileData.phoneNumber,
+            dateOfBirth: bnbUser.dateOfBirth || profileData.dateOfBirth,
+            isEmailVerified: profileData.isEmailVerified || true,
+            isPhoneVerified: bnbUser.isPhoneVerified || profileData.isPhoneVerified || false,
+            emirateID: bnbUser.emirateID || profileData.emirateID || false,
+            joinedDate: profileData.joinedDate || bnbUser.joinedDate || new Date().toISOString(),
+            responseRate: bnbUser.responseRate || profileData.responseRate || 100,
+            responseTime: bnbUser.responseTime || profileData.responseTime || 'within an hour',
+            isSuperhost: bnbUser.isSuperhost || profileData.isSuperhost || false,
+            languages: bnbUser.languages || profileData.languages || ['English'],
+            bio: bnbUser.bio || profileData.bio || 'Signed in with Google',
+            work: bnbUser.work || profileData.work || '',
+            location: bnbUser.location || profileData.location || '',
+            socialMedia: bnbUser.socialMedia || profileData.socialMedia || {},
+            preferences: bnbUser.preferences || profileData.preferences || {
+              currency: 'AED',
+              language: 'en',
+              notifications: {
+                email: true,
+                sms: false,
+                push: true
+              }
+            },
+            stats: bnbUser.stats || profileData.stats || {
+              totalBookings: 0,
+              totalReviews: 0,
+              averageRating: 0,
+              yearsHosting: 0
+            }
+          };
+          
+          setUser(fullUser);
+          console.log('✅ User profile loaded after Google OAuth login');
+        } catch (profileError) {
+          console.error('⚠️ Failed to fetch profile after Google OAuth, using basic data:', profileError);
+          
+          // Fallback to basic user data if profile fetch fails
+          const nameParts = response.user.name.split(' ');
+          const fallbackUser: User = {
+            id: response.user.id.toString(),
+            email: response.user.email,
+            firstName: googleData.firstName || nameParts[0] || '',
+            lastName: googleData.lastName || nameParts.slice(1).join(' ') || '',
+            profilePicture: googleData.profilePicture,
+            isEmailVerified: true,
+            isPhoneVerified: false,
+            emirateID: false,
+            joinedDate: new Date().toISOString(),
+            isSuperhost: false,
+            languages: ['English'],
+            preferences: {
+              currency: 'AED',
+              language: 'en',
+              notifications: {
+                email: true,
+                sms: false,
+                push: true
+              }
+            },
+            stats: {
+              totalBookings: 0,
+              totalReviews: 0,
+              averageRating: 0,
+              yearsHosting: 0
+            }
+          };
+          
+          setUser(fallbackUser);
+          console.log('✅ User logged in with Google OAuth (fallback data)');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Google OAuth login failed:', error);
+      throw error;
+    }
+  };
+
   const logout = () => {
     apiLogout();
     setUser(null);
@@ -284,52 +451,57 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const updateProfile = async (userData: Partial<User>) => {
     if (!user) return;
     
-    setIsLoading(true);
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Only send firstName and lastName to API
+      const profileData: UpdateProfileData = {};
       
-      // Update user data
-      const updatedUser = { ...user, ...userData };
+      if (userData.firstName !== undefined) {
+        profileData.firstName = userData.firstName;
+      }
+      if (userData.lastName !== undefined) {
+        profileData.lastName = userData.lastName;
+      }
+      
+      // Call API to update profile
+      const response = await apiUpdateProfile(profileData);
+      
+      // Update local user state with response data + provided userData (including fields not sent to API)
+      const updatedUser = { 
+        ...user, 
+        ...userData,
+        // Override with API response if available
+        firstName: response.firstName || userData.firstName || user.firstName,
+        lastName: response.lastName || userData.lastName || user.lastName,
+        profilePicture: response.avatar || response.avatarUrl || response.profilePicture || userData.profilePicture || user.profilePicture
+      };
       setUser(updatedUser);
       
-      // Save to localStorage
-      localStorage.setItem('user_data', JSON.stringify(updatedUser));
       console.log('✅ Profile updated successfully:', updatedUser);
     } catch (error) {
       console.error('❌ Profile update failed:', error);
-      throw new Error('Profile update failed');
-    } finally {
-      setIsLoading(false);
+      throw error;
     }
   };
 
   const uploadProfilePicture = async (file: File): Promise<string> => {
     try {
-      setIsLoading(true);
+      // Upload file using updateProfile endpoint with FormData
+      const response = await apiUpdateProfile({ avatar: file });
       
-      // Simulate file upload delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Create a preview URL for the uploaded file
-      const imageUrl = URL.createObjectURL(file);
+      // Get avatar URL from response
+      const imageUrl = response.avatar || response.avatarUrl || response.profilePicture;
       
       // Update user data with new profile picture
-      if (user) {
+      if (user && imageUrl) {
         const updatedUser = { ...user, profilePicture: imageUrl };
         setUser(updatedUser);
-        
-        // Save to localStorage
-        localStorage.setItem('user_data', JSON.stringify(updatedUser));
         console.log('✅ Profile picture updated successfully:', imageUrl);
       }
       
       return imageUrl;
     } catch (error) {
       console.error('❌ Profile picture upload failed:', error);
-      throw new Error('Profile picture upload failed');
-    } finally {
-      setIsLoading(false);
+      throw error;
     }
   };
 
@@ -362,6 +534,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     verifyOTP,
     resendOTP,
+    googleOAuthLogin,
     logout,
     updateProfile,
     uploadProfilePicture,

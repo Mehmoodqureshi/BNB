@@ -36,8 +36,7 @@ interface UserProfileProps {
 }
 
 const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
-  const { user, updateProfile, uploadProfilePicture } = useAuth();
-  const [isEditing, setIsEditing] = useState(false);
+  const { user, updateProfile, uploadProfilePicture} = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'verification' | 'preferences'>('profile');
   const [formData, setFormData] = useState({
     firstName: user?.firstName || '',
@@ -54,7 +53,28 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
     }
   });
   const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync formData with user data when modal opens or user changes
+  React.useEffect(() => {
+    if (isOpen && user) {
+      setFormData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        bio: user.bio || '',
+        work: user.work || '',
+        location: user.location || '',
+        phoneNumber: user.phoneNumber || '',
+        socialMedia: {
+          instagram: user.socialMedia?.instagram || '',
+          twitter: user.socialMedia?.twitter || '',
+          linkedin: user.socialMedia?.linkedin || '',
+          facebook: user.socialMedia?.facebook || ''
+        }
+      });
+    }
+  }, [isOpen, user]);
 
   if (!isOpen || !user) return null;
 
@@ -75,31 +95,22 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
   };
 
   const handleSave = async () => {
+    setIsSaving(true);
     try {
       await updateProfile(formData);
-      setIsEditing(false);
     } catch (error) {
       console.error('Failed to update profile:', error);
+      alert('Failed to save changes. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleCancel = () => {
-    setFormData({
-      firstName: user.firstName,
-      lastName: user.lastName,
-      bio: user.bio || '',
-      work: user.work || '',
-      location: user.location || '',
-      phoneNumber: user.phoneNumber || '',
-      socialMedia: {
-        instagram: user.socialMedia?.instagram || '',
-        twitter: user.socialMedia?.twitter || '',
-        linkedin: user.socialMedia?.linkedin || '',
-        facebook: user.socialMedia?.facebook || ''
-      }
-    });
-    setIsEditing(false);
-  };
+  // Check if firstName or lastName has changed
+  const hasChanges = user && (
+    formData.firstName !== user.firstName || 
+    formData.lastName !== user.lastName
+  );
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -107,8 +118,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
 
     setIsUploading(true);
     try {
-      const imageUrl = await uploadProfilePicture(file);
-      await updateProfile({ profilePicture: imageUrl });
+      // uploadProfilePicture already updates the user state with the new avatar
+      await uploadProfilePicture(file);
     } catch (error) {
       console.error('Failed to upload image:', error);
     } finally {
@@ -174,33 +185,24 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
             Profile
           </h2>
           <div className="flex items-center space-x-3">
-            {isEditing ? (
-              <>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleCancel}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleSave}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save
-                </Button>
-              </>
-            ) : (
+            {hasChanges && (
               <Button
-                variant="secondary"
+                variant="primary"
                 size="sm"
-                onClick={() => setIsEditing(true)}
+                onClick={handleSave}
+                disabled={isSaving}
               >
-                <Edit3 className="h-4 w-4 mr-2" />
-                Edit
+                {isSaving ? (
+                  <>
+                    <div className="h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
               </Button>
             )}
             <button
@@ -249,19 +251,17 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
                     alt={`${user.firstName} ${user.lastName}`}
                     className="w-24 h-24 rounded-full object-cover"
                   />
-                  {isEditing && (
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="absolute -bottom-2 -right-2 p-2 bg-[#006699] text-white rounded-full shadow-lg hover:bg-[#004466] transition-colors disabled:opacity-50"
-                    >
-                      {isUploading ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Camera className="h-4 w-4" />
-                      )}
-                    </button>
-                  )}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="absolute -bottom-2 -right-2 p-2 bg-[#006699] text-white rounded-full shadow-lg hover:bg-[#004466] transition-colors disabled:opacity-50"
+                  >
+                    {isUploading ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
+                  </button>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -300,8 +300,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleInputChange}
-                    disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent bg-white dark:bg-gray-800 disabled:bg-gray-50 dark:disabled:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                    placeholder="Enter your first name"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                   />
                 </div>
                 <div>
@@ -313,8 +313,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleInputChange}
-                    disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent bg-white dark:bg-gray-800 disabled:bg-gray-50 dark:disabled:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                    placeholder="Enter your last name"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                   />
                 </div>
                 <div>
@@ -343,7 +343,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
                       name="phoneNumber"
                       value={formData.phoneNumber}
                       onChange={handleInputChange}
-                      disabled={!isEditing}
+                      disabled
                       className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent bg-white dark:bg-gray-800 disabled:bg-gray-50 dark:disabled:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                     />
                     {user.isPhoneVerified && (
@@ -362,7 +362,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
                   name="bio"
                   value={formData.bio}
                   onChange={handleInputChange}
-                  disabled={!isEditing}
+                  disabled
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent disabled:bg-gray-50 dark:disabled:bg-gray-700"
                   placeholder="Tell us about yourself..."
@@ -380,7 +380,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
                     name="work"
                     value={formData.work}
                     onChange={handleInputChange}
-                    disabled={!isEditing}
+                    disabled
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent bg-white dark:bg-gray-800 disabled:bg-gray-50 dark:disabled:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                     placeholder="What do you do?"
                   />
@@ -394,7 +394,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
                     name="location"
                     value={formData.location}
                     onChange={handleInputChange}
-                    disabled={!isEditing}
+                    disabled
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent bg-white dark:bg-gray-800 disabled:bg-gray-50 dark:disabled:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                     placeholder="Where are you based?"
                   />
@@ -424,7 +424,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
                           name={`socialMedia.${social.key}`}
                           value={formData.socialMedia[social.key as keyof typeof formData.socialMedia]}
                           onChange={handleInputChange}
-                          disabled={!isEditing}
+                          disabled
                           className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#006699] focus:border-transparent bg-white dark:bg-gray-800 disabled:bg-gray-50 dark:disabled:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                           placeholder={social.placeholder}
                         />

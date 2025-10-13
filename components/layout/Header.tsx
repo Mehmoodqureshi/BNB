@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Menu, User, Moon, Sun, Plus } from 'lucide-react';
 import { useTheme } from '../providers/ThemeProvider';
 import { useAuth } from '../providers/AuthProvider';
@@ -11,6 +12,7 @@ import UserDashboard from '../auth/UserDashboard';
 import Button from '../ui/Button';
 
 const Header: React.FC = () => {
+  const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
   const { isAuthenticated, user } = useAuth();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -105,7 +107,10 @@ const Header: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <button className="hidden md:flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
+                  <button 
+                    onClick={() => router.push('/host/login')}
+                    className="hidden md:flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Become a Host
                   </button>
@@ -136,7 +141,7 @@ const Header: React.FC = () => {
                         <hr className="my-2 border-gray-200 dark:border-gray-700" />
                         <button
                           onClick={() => {
-                            console.log('Host your home');
+                            router.push('/host/login');
                             setIsUserMenuOpen(false);
                           }}
                           className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"

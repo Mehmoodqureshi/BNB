@@ -34,7 +34,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const { login, register, verifyOTP, resendOTP, updateProfile, user, setUser } = useAuth();
+  const { login, register, verifyOTP, resendOTP, googleOAuthLogin, updateProfile, user, setUser } = useAuth();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -77,9 +77,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
     try {
       if (mode === 'login') {
         console.log('🔐 Attempting login...');
-        // Login functionality would go here
-        console.log('✅ Login successful, closing modal');
-        onClose();
+        await login(formData.email);
+        console.log('✅ Login OTP sent, showing OTP modal');
+        setRegisteredEmail(formData.email);
+        setShowOTPModal(true);
       } else {
         console.log('📝 Attempting registration...');
         await register({
@@ -101,17 +102,33 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
 
   const handleGoogleSuccess = async (user: any) => {
     console.log('🎉 Google success callback received:', user);
+    setIsLoading(true);
     try {
-      // Set the user directly in the auth provider
-      console.log('🔄 Setting user in auth provider...');
-      setUser(user);
-      localStorage.setItem('auth_token', 'google_token_' + user.id);
-      localStorage.setItem('user_data', JSON.stringify(user));
-      console.log('✅ User logged in successfully, closing modal');
+      // Use the Google OAuth login function from AuthProvider to call your backend API
+      console.log('🔄 Processing Google OAuth login...');
+      console.log('📧 Sending data:', {
+        credential: user.credential ? 'Present' : 'Missing',
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        profilePicture: user.profilePicture ? 'Present' : 'Missing'
+      });
+      
+      await googleOAuthLogin({
+        credential: user.credential || '', // This should be the JWT token from Google
+        googleId: user.googleId || user.id || '', // Google user ID
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        profilePicture: user.profilePicture
+      });
+      console.log('✅ User logged in successfully with Google OAuth, closing modal');
       onClose();
     } catch (error) {
-      console.error('❌ Google login error:', error);
-      setErrors({ general: 'Google login failed' });
+      console.error('❌ Google OAuth login error:', error);
+      setErrors({ general: error instanceof Error ? error.message : 'Google login failed' });
+    } finally {
+      setIsLoading(false);
     }
   };
 
