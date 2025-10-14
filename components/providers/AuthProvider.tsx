@@ -61,7 +61,7 @@ interface AuthContextType {
   verifyEmail: (token: string) => Promise<void>;
   verifyPhone: (phoneNumber: string, code: string) => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
-  resendVerificationSMS: () => Promise<void>;
+  resendVerificationSMS: (phoneNumber: string) => Promise<void>;
 }
 
 interface RegisterData {
@@ -511,8 +511,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const verifyPhone = async (phoneNumber: string, code: string) => {
-    // TODO: Implement phone verification
-    console.log('Verify phone:', phoneNumber, 'with code:', code);
+    try {
+      const token = localStorage.getItem('bnbuser');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_END_POINT}/bnb-users/bnbVerifyOTP`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phoneNumber, otp: code }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Phone verification failed');
+      }
+
+      const data = await response.json();
+      console.log('✅ Phone verification successful');
+      return data;
+    } catch (error) {
+      console.error('❌ Phone verification failed:', error);
+      throw error;
+    }
   };
 
   const resendVerificationEmail = async () => {
@@ -520,9 +545,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('Resend verification email');
   };
 
-  const resendVerificationSMS = async () => {
-    // TODO: Implement resend verification SMS
-    console.log('Resend verification SMS');
+  const resendVerificationSMS = async (phoneNumber: string) => {
+    try {
+      const token = localStorage.getItem('bnbuser');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_END_POINT}/bnb-users/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phoneNo: phoneNumber }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to resend SMS');
+      }
+
+      console.log('✅ SMS resent successfully');
+    } catch (error) {
+      console.error('❌ Failed to resend SMS:', error);
+      throw error;
+    }
   };
 
   const value: AuthContextType = {

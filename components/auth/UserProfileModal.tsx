@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Camera, User, Mail, Phone, MapPin, Calendar, Shield } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
+import OTPVerificationModal from './OTPVerificationModal';
+import { useSendPhoneOTP, useVerifyPhoneOTP, useUploadEmiratesID } from '@/lib/auth/authService';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -11,7 +13,7 @@ interface UserProfileModalProps {
 
 const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) => {
   const { user, updateProfile, uploadProfilePicture } = useAuth();
-  console.log('🔵 User in UserProfileModal:', user);``
+  console.log('🔵 User in UserProfileModal:', user);
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -34,6 +36,16 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) 
     step: 'input',
     data: {}
   });
+  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [otpModalType, setOtpModalType] = useState<'email' | 'phone'>('email');
+  const [otpModalValue, setOtpModalValue] = useState('');
+  
+  // Phone verification hooks
+  const sendPhoneOTPMutation = useSendPhoneOTP();
+  const verifyPhoneOTPMutation = useVerifyPhoneOTP();
+  
+  // Emirates ID verification hook
+  const uploadEmiratesIDMutation = useUploadEmiratesID();
   const [formData, setFormData] = useState({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
@@ -105,12 +117,32 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) 
     });
   };
 
-  const handlePhoneVerification = () => {
-    setVerificationModal({
-      type: 'phone',
-      step: 'input',
-      data: { phoneNumber: user?.phoneNumber || '' }
-    });
+  const handlePhoneVerification = async () => {
+    const phoneNumber = user?.phoneNumber || '';
+    
+    if (!phoneNumber) {
+      // If no phone number, show the input modal first
+      setVerificationModal({
+        type: 'phone',
+        step: 'input',
+        data: { phoneNumber: '' }
+      });
+      return;
+    }
+
+    // If phone number exists, send OTP directly
+    try {
+      setVerificationLoading(prev => ({ ...prev, phone: true }));
+      await sendPhoneOTPMutation.mutateAsync(phoneNumber);
+      setOtpModalType('phone');
+      setOtpModalValue(phoneNumber);
+      setShowOTPModal(true);
+    } catch (error) {
+      console.error('Failed to send phone OTP:', error);
+      alert('Failed to send verification code. Please try again.');
+    } finally {
+      setVerificationLoading(prev => ({ ...prev, phone: false }));
+    }
   };
 
   const handleEmirateIDVerification = () => {
@@ -140,24 +172,43 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) 
         await new Promise(resolve => setTimeout(resolve, 2000));
         setVerificationModal(prev => ({ ...prev, step: 'success' }));
       } else if (verificationModal.type === 'phone') {
-        // Simulate sending SMS
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        setVerificationModal(prev => ({ 
-          ...prev, 
-          step: 'code',
-          data: { ...prev.data, phoneNumber: formData.phoneNumber }
-        }));
+        // Send phone OTP using real API
+        const phoneNumber = formData.phoneNumber;
+        if (!phoneNumber) {
+          throw new Error('Phone number is required');
+        }
+        
+        await sendPhoneOTPMutation.mutateAsync(phoneNumber);
+        setOtpModalType('phone');
+        setOtpModalValue(phoneNumber);
+        setShowOTPModal(true);
+        closeVerificationModal(); // Close the input modal
       } else if (verificationModal.type === 'emirateID') {
-        // Simulate ID verification
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Validate Emirates ID format
+        const emiratesID = formData.emirateID;
+        if (!emiratesID) {
+          throw new Error('Emirates ID number is required');
+        }
+        
+        // Basic validation for Emirates ID format
+        // Remove any spaces, dashes, and convert to uppercase for validation
+        const cleanEmiratesID = emiratesID.replace(/[-\s]/g, '').toUpperCase();
+        
+        // Check if it's a valid Emirates ID format (15 digits starting with 784)
+        const emiratesIDRegex = /^784\d{12}$/;
+        if (!emiratesIDRegex.test(cleanEmiratesID)) {
+          throw new Error('Please enter a valid Emirates ID number (15 digits starting with 784)');
+        }
+        
         setVerificationModal(prev => ({ 
           ...prev, 
           step: 'upload',
-          data: { ...prev.data, emirateID: formData.emirateID }
+          data: { ...prev.data, emirateID: emiratesID }
         }));
       }
     } catch (error) {
       console.error('Verification failed:', error);
+      alert(error instanceof Error ? error.message : 'Verification failed');
     } finally {
       setVerificationLoading(prev => ({ ...prev, [verificationModal.type!]: false }));
     }
@@ -195,24 +246,72 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) 
     }
   };
 
+  // OTP verification handlers
+  const handleOTPVerify = async (otp: string) => {
+    try {
+      if (otpModalType === 'phone') {
+        await verifyPhoneOTPMutation.mutateAsync({ phoneNumber: otpModalValue, otp });
+        
+        // Update user verification status
+        if (user) {
+          const updatedUser = { 
+            ...user, 
+            isPhoneVerified: true, 
+            phoneNumber: otpModalValue 
+          };
+          await updateProfile(updatedUser);
+        }
+        
+        setShowOTPModal(false);
+        alert('Phone number verified successfully!');
+      } else {
+        // Handle email verification (existing logic)
+        // This would be implemented if needed
+        console.log('Email OTP verification:', otp);
+      }
+    } catch (error) {
+      console.error('OTP verification failed:', error);
+      throw error; // Re-throw to let the modal handle the error display
+    }
+  };
+
+  const handleOTPResend = async () => {
+    try {
+      if (otpModalType === 'phone') {
+        await sendPhoneOTPMutation.mutateAsync(otpModalValue);
+      } else {
+        // Handle email resend (existing logic)
+        console.log('Resending email OTP');
+      }
+    } catch (error) {
+      console.error('Failed to resend OTP:', error);
+      throw error; // Re-throw to let the modal handle the error display
+    }
+  };
+
   const handleDocumentUpload = async (file: File) => {
-    if (!verificationModal.type) return;
+    if (!verificationModal.type || verificationModal.type !== 'emirateID') return;
 
     setVerificationLoading(prev => ({ ...prev, [verificationModal.type!]: true }));
 
     try {
-      // Simulate document upload
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const emiratesID = verificationModal.data.emirateID;
+      if (!emiratesID) {
+        throw new Error('Emirates ID number is required');
+      }
+
+      // Upload Emirates ID using real API
+      await uploadEmiratesIDMutation.mutateAsync({ emiratesID, file });
       setVerificationModal(prev => ({ ...prev, step: 'success' }));
       
       // Update user verification status
-      if (user && verificationModal.type === 'emirateID') {
+      if (user) {
         const updatedUser = { ...user, emirateID: true };
         await updateProfile(updatedUser);
       }
     } catch (error) {
       console.error('Document upload failed:', error);
-      alert('Failed to upload document. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to upload document. Please try again.');
     } finally {
       setVerificationLoading(prev => ({ ...prev, [verificationModal.type!]: false }));
     }
@@ -516,6 +615,17 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) 
           onDocumentUpload={handleDocumentUpload}
         />
       )}
+
+      {/* OTP Verification Modal */}
+      <OTPVerificationModal
+        isOpen={showOTPModal}
+        onClose={() => setShowOTPModal(false)}
+        type={otpModalType}
+        email={otpModalType === 'email' ? otpModalValue : undefined}
+        phoneNumber={otpModalType === 'phone' ? otpModalValue : undefined}
+        onVerify={handleOTPVerify}
+        onResend={handleOTPResend}
+      />
     </div>
   );
 };

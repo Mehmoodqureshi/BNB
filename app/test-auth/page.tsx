@@ -5,6 +5,7 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import AuthModal from '@/components/auth/AuthModal';
 import UserProfile from '@/components/auth/UserProfile';
 import UserDashboard from '@/components/auth/UserDashboard';
+import UserProfileModal from '@/components/auth/UserProfileModal';
 import Button from '@/components/ui/Button';
 
 export default function TestAuthPage() {
@@ -12,6 +13,7 @@ export default function TestAuthPage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-8">
@@ -39,6 +41,12 @@ export default function TestAuthPage() {
                 </p>
                 <p className="text-gray-700 dark:text-gray-300">
                   <strong>Superhost:</strong> {user.isSuperhost ? '✅ Yes' : '❌ No'}
+                </p>
+                <p className="text-gray-700 dark:text-gray-300">
+                  <strong>Phone:</strong> {user.phoneNumber || 'Not provided'}
+                </p>
+                <p className="text-gray-700 dark:text-gray-300">
+                  <strong>Phone Verified:</strong> {user.isPhoneVerified ? '✅ Yes' : '❌ No'}
                 </p>
               </>
             )}
@@ -83,6 +91,13 @@ export default function TestAuthPage() {
                 View Dashboard
               </Button>
               <Button
+                variant="secondary"
+                onClick={() => setShowProfileModal(true)}
+                className="w-full"
+              >
+                Profile Settings
+              </Button>
+              <Button
                 variant="outline"
                 onClick={logout}
                 className="w-full"
@@ -121,6 +136,10 @@ export default function TestAuthPage() {
             <UserDashboard
               isOpen={showDashboard}
               onClose={() => setShowDashboard(false)}
+            />
+            <UserProfileModal
+              isOpen={showProfileModal}
+              onClose={() => setShowProfileModal(false)}
             />
           </>
         )}

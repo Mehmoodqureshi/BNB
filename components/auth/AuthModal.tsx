@@ -319,6 +319,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
       <OTPVerificationModal
         isOpen={showOTPModal}
         onClose={() => setShowOTPModal(false)}
+        type="email"
         email={registeredEmail}
         onVerify={handleVerifyOTP}
         onResend={handleResendOTP}

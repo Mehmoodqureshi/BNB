@@ -1,14 +1,16 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Mail } from 'lucide-react';
+import { X, Mail, Phone } from 'lucide-react';
 import Button from '../ui/Button';
 import { clsx } from 'clsx';
 
 interface OTPVerificationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  email: string;
+  email?: string;
+  phoneNumber?: string;
+  type: 'email' | 'phone';
   onVerify: (otp: string) => Promise<void>;
   onResend: () => Promise<void>;
 }
@@ -17,6 +19,8 @@ const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
   isOpen,
   onClose,
   email,
+  phoneNumber,
+  type,
   onVerify,
   onResend,
 }) => {
@@ -25,6 +29,21 @@ const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Format phone number for display
+  const formatPhoneNumber = (phone: string) => {
+    // Simple formatting for UAE numbers
+    if (phone.startsWith('+971')) {
+      return phone.replace(/(\+971)(\d{2})(\d{3})(\d{4})/, '$1 $2 $3 $4');
+    }
+    return phone;
+  };
+
+  // Get the appropriate icon and text based on type
+  const getIcon = () => type === 'phone' ? Phone : Mail;
+  const getTitle = () => type === 'phone' ? 'Verify your phone' : 'Verify your email';
+  const getButtonText = () => type === 'phone' ? 'Verify Phone' : 'Verify Email';
+  const getDisplayValue = () => type === 'phone' ? formatPhoneNumber(phoneNumber || '') : email;
 
   // Countdown timer for resend
   useEffect(() => {
@@ -136,7 +155,7 @@ const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Verify your email
+            {getTitle()}
           </h2>
           <button
             onClick={onClose}
@@ -150,13 +169,13 @@ const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
         <div className="p-6">
           <div className="flex items-center justify-center mb-6">
             <div className="w-16 h-16 bg-[#006699]/10 rounded-full flex items-center justify-center">
-              <Mail className="h-8 w-8 text-[#006699]" />
+              {React.createElement(getIcon(), { className: "h-8 w-8 text-[#006699]" })}
             </div>
           </div>
 
           <p className="text-center text-gray-600 dark:text-gray-400 mb-6">
             We've sent a verification code to<br />
-            <span className="font-semibold text-gray-900 dark:text-white">{email}</span>
+            <span className="font-semibold text-gray-900 dark:text-white">{getDisplayValue()}</span>
           </p>
 
           {/* Error Message */}
@@ -202,7 +221,7 @@ const OTPVerificationModal: React.FC<OTPVerificationModalProps> = ({
               className="w-full"
               disabled={isLoading || otp.join('').length !== 4}
             >
-              {isLoading ? 'Verifying...' : 'Verify Email'}
+              {isLoading ? 'Verifying...' : getButtonText()}
             </Button>
           </form>
 

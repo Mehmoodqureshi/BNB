@@ -596,6 +596,180 @@ export const useGoogleOAuthLogin = () => {
 };
 
 /**
+ * Send phone OTP API call
+ */
+export const sendPhoneOTP = async (phoneNumber: string): Promise<AuthResponse> => {
+  const token = tokenStorage.get();
+  
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  console.log('🔵 Send Phone OTP Request:', `${API_URL}/bnb-users/send-otp`);
+  console.log('📱 Phone:', phoneNumber);
+
+  const response = await fetch(`${API_URL}/bnb-users/send-otp`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ phoneNo: phoneNumber }),
+  });
+
+  console.log('🔵 Response Status:', response.status);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      // Token expired or invalid
+      tokenStorage.remove();
+      throw new Error('Session expired. Please login again.');
+    }
+    const error = await response.json();
+    console.log('🔴 Error:', error);
+    throw new Error(error.message || 'Failed to send phone OTP');
+  }
+
+  const data: AuthResponse = await response.json();
+  console.log('🟢 Phone OTP sent successfully');
+
+  return data;
+};
+
+/**
+ * Verify phone OTP API call
+ */
+export const verifyPhoneOTP = async (phoneNumber: string, otp: string): Promise<AuthResponse> => {
+  const token = tokenStorage.get();
+  
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  console.log('🔵 Phone OTP Verification Request:', `${API_URL}/bnb-users/bnbVerifyOTP`);
+  console.log('📱 Phone:', phoneNumber);
+
+  const response = await fetch(`${API_URL}/bnb-users/bnbVerifyOTP`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ phoneNumber, otp }),
+  });
+
+  console.log('🔵 Response Status:', response.status);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      // Token expired or invalid
+      tokenStorage.remove();
+      throw new Error('Session expired. Please login again.');
+    }
+    const error = await response.json();
+    console.log('🔴 Error:', error);
+    throw new Error(error.message || 'Phone OTP verification failed');
+  }
+
+  const data: AuthResponse = await response.json();
+  console.log('🟢 Phone OTP verification successful');
+
+  return data;
+};
+
+/**
+ * Hook for sending phone OTP mutation
+ */
+export const useSendPhoneOTP = () => {
+  return useMutation({
+    mutationFn: sendPhoneOTP,
+    onSuccess: () => {
+      console.log('✅ Phone OTP sent successfully');
+    },
+    onError: (error: Error) => {
+      console.error('❌ Failed to send phone OTP:', error.message);
+    },
+  });
+};
+
+/**
+ * Hook for phone OTP verification mutation
+ */
+export const useVerifyPhoneOTP = () => {
+  return useMutation({
+    mutationFn: ({ phoneNumber, otp }: { phoneNumber: string; otp: string }) => 
+      verifyPhoneOTP(phoneNumber, otp),
+    onSuccess: (data) => {
+      console.log('✅ Phone verification successful');
+    },
+    onError: (error: Error) => {
+      console.error('❌ Phone OTP verification failed:', error.message);
+    },
+  });
+};
+
+/**
+ * Upload Emirates ID document API call
+ */
+export const uploadEmiratesID = async (emiratesID: string, file: File): Promise<AuthResponse> => {
+  const token = tokenStorage.get();
+  
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  console.log('🔵 Upload Emirates ID Request:', `${API_URL}/bnb-users/upload-emirates-id`);
+  console.log('🆔 Emirates ID:', emiratesID);
+
+  // Create FormData for file upload
+  const formData = new FormData();
+  formData.append('emiratesIdNumber', emiratesID);
+  formData.append('emiratesIdImage', file);
+
+  const response = await fetch(`${API_URL}/bnb-users/upload-emirates-id`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  console.log('🔵 Response Status:', response.status);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      // Token expired or invalid
+      tokenStorage.remove();
+      throw new Error('Session expired. Please login again.');
+    }
+    const error = await response.json();
+    console.log('🔴 Error:', error);
+    throw new Error(error.message || 'Failed to upload Emirates ID');
+  }
+
+  const data: AuthResponse = await response.json();
+  console.log('🟢 Emirates ID uploaded successfully');
+
+  return data;
+};
+
+/**
+ * Hook for uploading Emirates ID mutation
+ */
+export const useUploadEmiratesID = () => {
+  return useMutation({
+    mutationFn: ({ emiratesID, file }: { emiratesID: string; file: File }) => 
+      uploadEmiratesID(emiratesID, file),
+    onSuccess: (data) => {
+      console.log('✅ Emirates ID uploaded successfully');
+    },
+    onError: (error: Error) => {
+      console.error('❌ Failed to upload Emirates ID:', error.message);
+    },
+  });
+};
+
+/**
  * Hook to fetch user profile using TanStack Query
  */
 export const useUserProfile = () => {
