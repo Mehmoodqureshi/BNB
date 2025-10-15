@@ -1,26 +1,106 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Shield, Lock, Mail, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import { useLogin } from '@/lib/auth/authService';
+import { useLogin, getCurrentUser, decodeToken } from '@/lib/auth/authService';
+import { adminToken, setTokenByRole } from '@/lib/utils/tokenStorage';
 import { getRoleRedirect } from '@/lib/auth/roleGuard';
 
 const AdminLoginPage: React.FC = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isCheckingToken, setIsCheckingToken] = useState(true);
+  const [urlTokenFound, setUrlTokenFound] = useState(false);
 
   // 🚀 Unified Auth Service
   const loginMutation = useLogin();
+
+  // Check for token in URL or stored token on component mount
+  useEffect(() => {
+    const checkTokenAuth = async () => {
+      try {
+        // First check if there's a token in URL
+        const urlToken = searchParams.get('token');
+        
+        if (urlToken) {
+          console.log('🔑 Token found in URL, attempting auto-login...');
+          console.log('🔑 Token value:', urlToken.substring(0, 50) + '...');
+          setUrlTokenFound(true);
+          
+          // Store the URL token in admin storage
+          adminToken.set(urlToken);
+          console.log('💾 Admin token stored in localStorage as "adminToken"');
+          
+          // Wait a moment for storage to complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Verify the token and get user info
+          const currentUser = decodeToken(urlToken);
+          console.log('👤 Current user from token:', currentUser);
+          
+          if (currentUser && currentUser.role === 'agency') {
+            console.log('✅ URL token is valid for admin, redirecting...');
+            const redirectPath = getRoleRedirect(currentUser.role);
+            console.log('🚀 Redirecting to:', redirectPath);
+            // Add a small delay to ensure token is properly stored
+            setTimeout(() => {
+              router.push(redirectPath);
+            }, 200);
+            return;
+          } else {
+            console.log('❌ URL token is invalid or not for admin');
+            console.log('❌ User role:', currentUser?.role, 'Expected: agency');
+            adminToken.remove();
+          }
+        } else {
+          // No URL token, check stored admin token
+          const storedToken = adminToken.get();
+          
+          if (storedToken) {
+            console.log('🔑 Stored admin token found, checking validity...');
+            const currentUser = decodeToken(storedToken);
+            
+            if (currentUser && currentUser.role === 'agency') {
+              console.log('✅ Stored token is valid for admin, redirecting...');
+              const redirectPath = getRoleRedirect(currentUser.role);
+              // Add a small delay to ensure token is properly stored
+              setTimeout(() => {
+                router.push(redirectPath);
+              }, 200);
+              return;
+            } else {
+              console.log('❌ Stored token is invalid or not for admin');
+              adminToken.remove();
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Token validation failed:', error);
+        adminToken.remove();
+      } finally {
+        setIsCheckingToken(false);
+      }
+    };
+
+    checkTokenAuth();
+  }, [searchParams, router]);
 
   const handleLoginSuccess = (data: any) => {
     // Check if user has agency role
     if (data.role !== 'agency') {
       alert('Access denied: Only agency accounts can access the admin panel');
       return;
+    }
+
+    // Store the token in admin storage
+    if (data.access_token) {
+      adminToken.set(data.access_token);
+      console.log('💾 Admin token stored after login');
     }
 
     // Redirect to appropriate dashboard based on role
@@ -38,6 +118,19 @@ const AdminLoginPage: React.FC = () => {
       }
     );
   };
+
+  // Show loading state while checking for tokens
+  if (isCheckingToken) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mx-auto mb-4"></div>
+          <p className="text-white text-lg">Checking authentication...</p>
+          <p className="text-blue-200 text-sm mt-2">Verifying token access</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 flex items-center justify-center p-4">
@@ -102,6 +195,18 @@ const AdminLoginPage: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            {/* URL Token Message */}
+            {urlTokenFound && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    Token found in URL but is invalid or expired. Please login with your credentials.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Error Message */}
             {loginMutation.isError && (

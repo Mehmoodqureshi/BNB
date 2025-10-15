@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { logout as apiLogout, getCurrentUser, tokenStorage, useRegister as useRegisterMutation, useVerifyOTP as useVerifyOTPMutation, useResendOTP as useResendOTPMutation, useLoginBnbUser as useLoginBnbUserMutation, useGoogleOAuthLogin as useGoogleOAuthLoginMutation, updateProfile as apiUpdateProfile, getUserProfile as apiGetUserProfile, type UpdateProfileData, type GoogleOAuthData } from '@/lib/auth/authService';
+import { logout as apiLogout, getCurrentUser, decodeToken, useRegister as useRegisterMutation, useVerifyOTP as useVerifyOTPMutation, useResendOTP as useResendOTPMutation, useLoginBnbUser as useLoginBnbUserMutation, useGoogleOAuthLogin as useGoogleOAuthLoginMutation, updateProfile as apiUpdateProfile, getUserProfile as apiGetUserProfile, type UpdateProfileData, type GoogleOAuthData } from '@/lib/auth/authService';
+import { userToken } from '@/lib/utils/tokenStorage';
 
 export interface User {
   id: string;
@@ -94,19 +95,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const token = tokenStorage.get();
+      const token = userToken.get();
       
       if (!token) {
-        console.log('ℹ️ No token found in localStorage');
+        console.log('ℹ️ No user token found in localStorage');
         setIsLoading(false);
         return;
       }
       
-      const currentUser = getCurrentUser();
+      const currentUser = decodeToken(token);
       
       if (!currentUser) {
         console.log('🔴 Invalid or expired token, removing...');
-        tokenStorage.remove();
+        userToken.remove();
         setIsLoading(false);
         return;
       }
@@ -198,12 +199,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log('✅ User auto-logged in from stored token (fallback)');
         }
       } else {
-        console.log('ℹ️ Token exists but wrong role:', currentUser.role);
-        tokenStorage.remove();
+        console.log('ℹ️ Token exists but not for bnbuser role:', currentUser.role);
+        // Don't remove the token - it might be for admin/agent which are handled by their respective hooks
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('❌ Auth check failed:', error);
-      tokenStorage.remove();
+      userToken.remove();
     } finally {
       setIsLoading(false);
     }
@@ -512,7 +514,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const verifyPhone = async (phoneNumber: string, code: string) => {
     try {
-      const token = localStorage.getItem('bnbuser');
+      const token = userToken.get();
       if (!token) {
         throw new Error('No authentication token found');
       }
@@ -547,7 +549,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const resendVerificationSMS = async (phoneNumber: string) => {
     try {
-      const token = localStorage.getItem('bnbuser');
+      const token = userToken.get();
       if (!token) {
         throw new Error('No authentication token found');
       }

@@ -23,7 +23,7 @@ const AdminSidebar: React.FC = () => {
     {
       section: 'Management',
       items: [
-        { label: 'Users', icon: Users, path: '/admin/users', badge: null },
+        { label: 'Hosts', icon: Users, path: '/admin/hosts', badge: null },
         { label: 'Properties', icon: Home, path: '/admin/properties', badge: 5 }, // Pending approval
         { label: 'Bookings', icon: Calendar, path: '/admin/bookings', badge: null },
         { label: 'Reviews', icon: Star, path: '/admin/reviews', badge: 3 }, // Flagged

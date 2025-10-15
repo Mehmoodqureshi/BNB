@@ -1,5 +1,6 @@
 import { Message, Conversation, SendMessageRequest, CreateConversationRequest } from '@/lib/types/messaging';
 import { io, Socket } from 'socket.io-client';
+import { getCurrentToken } from '@/lib/utils/tokenStorage';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
@@ -23,9 +24,17 @@ class MessageService {
       return;
     }
 
-    const token = localStorage.getItem('auth_token');
+    // Try to get token from any role (user, admin, host)
+    const { getCurrentUser } = require('@/lib/auth/authService');
+    const user = getCurrentUser();
+    if (!user) {
+      console.error('No authenticated user found');
+      return;
+    }
+    
+    const token = getCurrentToken(user.role);
     if (!token) {
-      console.error('No auth token found');
+      console.error('No auth token found for role:', user.role);
       return;
     }
 
@@ -115,7 +124,16 @@ class MessageService {
 
   // API calls
   private async makeRequest(endpoint: string, options: RequestInit = {}) {
-    const token = localStorage.getItem('auth_token');
+    const { getCurrentUser } = require('@/lib/auth/authService');
+    const user = getCurrentUser();
+    if (!user) {
+      throw new Error('No authenticated user found');
+    }
+    
+    const token = getCurrentToken(user.role);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
     
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
@@ -202,7 +220,16 @@ class MessageService {
     formData.append('file', file);
     formData.append('conversationId', conversationId);
 
-    const token = localStorage.getItem('auth_token');
+    const { getCurrentUser } = require('@/lib/auth/authService');
+    const user = getCurrentUser();
+    if (!user) {
+      throw new Error('No authenticated user found');
+    }
+    
+    const token = getCurrentToken(user.role);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
     const response = await fetch(`${API_BASE_URL}/messages/upload`, {
       method: 'POST',
       headers: {

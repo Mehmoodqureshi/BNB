@@ -7,7 +7,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getCurrentUser, tokenStorage, type UserRole } from './authService';
+import { getCurrentUser, type UserRole } from './authService';
+import { getCurrentToken } from '@/lib/utils/tokenStorage';
 
 /**
  * Hook to protect routes based on user role
@@ -25,8 +26,18 @@ export const useRoleGuard = (allowedRoles: UserRole[]) => {
   const checkAccess = () => {
     const user = getCurrentUser();
 
-    if (!user || !tokenStorage.exists()) {
+    if (!user) {
       console.log('❌ No authentication found');
+      setIsAuthorized(false);
+      setIsLoading(false);
+      redirectToLogin(pathname);
+      return;
+    }
+
+    // Check if token exists for the user's role
+    const token = getCurrentToken(user.role);
+    if (!token) {
+      console.log('❌ No token found for role:', user.role);
       setIsAuthorized(false);
       setIsLoading(false);
       redirectToLogin(pathname);

@@ -4,6 +4,7 @@
  */
 
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { setTokenByRole, removeTokenByRole } from '@/lib/utils/tokenStorage';
 
 const API_URL = process.env.NEXT_PUBLIC_END_POINT ;
 
@@ -76,7 +77,8 @@ export const tokenStorage = {
   },
 
   exists: (): boolean => {
-    return !!tokenStorage.get();
+    // This function is deprecated - use role-specific token checks instead
+    return false;
   },
 };
 
@@ -126,9 +128,26 @@ export const decodeToken = (token: string): AuthUser | null => {
  * Get current authenticated user from token
  */
 export const getCurrentUser = (): AuthUser | null => {
-  const token = tokenStorage.get();
-  if (!token) return null;
-  return decodeToken(token);
+  // This function is deprecated - use role-specific token checks instead
+  // Try to find any valid token across all roles
+  const { adminToken, hostToken, userToken } = require('@/lib/utils/tokenStorage');
+  
+  const tokens = [
+    { token: adminToken.get(), role: 'agency' },
+    { token: hostToken.get(), role: 'agent' },
+    { token: userToken.get(), role: 'bnbuser' }
+  ];
+  
+  for (const { token, role } of tokens) {
+    if (token) {
+      const user = decodeToken(token);
+      if (user && user.role === role) {
+        return user;
+      }
+    }
+  }
+  
+  return null;
 };
 
 /**
@@ -228,7 +247,8 @@ export const resendOTP = async (email: string): Promise<void> => {
  * Get user profile from API
  */
 export const getUserProfile = async (): Promise<any> => {
-  const token = tokenStorage.get();
+  const { userToken } = require('@/lib/utils/tokenStorage');
+  const token = userToken.get();
   
   if (!token) {
     throw new Error('No authentication token found');
@@ -249,7 +269,8 @@ export const getUserProfile = async (): Promise<any> => {
   if (!response.ok) {
     if (response.status === 401) {
       // Token expired or invalid
-      tokenStorage.remove();
+      const { userToken } = require('@/lib/utils/tokenStorage');
+      userToken.remove();
       throw new Error('Session expired. Please login again.');
     }
     const error = await response.json();
@@ -274,7 +295,8 @@ export interface UpdateProfileData {
 }
 
 export const updateProfile = async (profileData: UpdateProfileData): Promise<any> => {
-  const token = tokenStorage.get();
+  const { userToken } = require('@/lib/utils/tokenStorage');
+  const token = userToken.get();
   
   if (!token) {
     throw new Error('No authentication token found');
@@ -308,7 +330,8 @@ export const updateProfile = async (profileData: UpdateProfileData): Promise<any
 
   if (!response.ok) {
     if (response.status === 401) {
-      tokenStorage.remove();
+      const { userToken } = require('@/lib/utils/tokenStorage');
+      userToken.remove();
       throw new Error('Session expired. Please login again.');
     }
     const error = await response.json();
@@ -384,7 +407,8 @@ export const loginBnbUser = async (email: string): Promise<AuthResponse> => {
  * Logout - clear token and user data
  */
 export const logout = (): void => {
-  tokenStorage.remove();
+  const { clearAllTokens } = require('@/lib/utils/tokenStorage');
+  clearAllTokens();
   console.log('✅ Logged out successfully');
 };
 
@@ -400,10 +424,7 @@ export const hasRole = (requiredRole: UserRole): boolean => {
  * Check if user is authenticated
  */
 export const isAuthenticated = (): boolean => {
-  const token = tokenStorage.get();
-  if (!token) return false;
-
-  const user = decodeToken(token);
+  const user = getCurrentUser();
   return !!user;
 };
 
@@ -411,7 +432,11 @@ export const isAuthenticated = (): boolean => {
  * Get authorization header for API requests
  */
 export const getAuthHeader = (): string | null => {
-  const token = tokenStorage.get();
+  const user = getCurrentUser();
+  if (!user) return null;
+  
+  const { getCurrentToken } = require('@/lib/utils/tokenStorage');
+  const token = getCurrentToken(user.role);
   return token ? `Bearer ${token}` : null;
 };
 
@@ -439,11 +464,11 @@ export const useVerifyOTP = () => {
       verifyOTP(email, otp),
     onSuccess: (data) => {
       console.log('📦 OTP Verification Response:', data);
-      // Store the token in localStorage as 'bnbuser'
+      // Store the token in user storage
       const token = data.token || data.access_token;
       if (token) {
-        tokenStorage.set(token);
-        console.log('✅ Token stored in localStorage as "bnbuser"');
+        setTokenByRole(token, 'bnbuser');
+        console.log('✅ Token stored in localStorage as "userToken"');
         console.log('🔐 Token expires in 30 days');
       }
     },
@@ -475,10 +500,10 @@ export const useLogin = () => {
   return useMutation({
     mutationFn: login,
     onSuccess: (data) => {
-      // Save token
-      if (data.access_token) {
-        tokenStorage.set(data.access_token);
-        console.log('💾 Token saved');
+      // Save token based on role
+      if (data.access_token && data.role) {
+        setTokenByRole(data.access_token, data.role);
+        console.log('💾 Token saved for role:', data.role);
       }
       console.log('👤 User:', data.name, `(${data.role})`);
     },
@@ -581,11 +606,11 @@ export const useGoogleOAuthLogin = () => {
     mutationFn: googleOAuthLogin,
     onSuccess: (data) => {
       console.log('📦 Google OAuth Response:', data);
-      // Store the token in localStorage as 'bnbuser'
+      // Store the token in user storage
       const token = data.token || data.access_token;
       if (token) {
-        tokenStorage.set(token);
-        console.log('✅ Token stored in localStorage as "bnbuser"');
+        setTokenByRole(token, 'bnbuser');
+        console.log('✅ Token stored in localStorage as "userToken"');
         console.log('🔐 Token expires in 30 days');
       }
     },
@@ -599,7 +624,8 @@ export const useGoogleOAuthLogin = () => {
  * Send phone OTP API call
  */
 export const sendPhoneOTP = async (phoneNumber: string): Promise<AuthResponse> => {
-  const token = tokenStorage.get();
+  const { userToken } = require('@/lib/utils/tokenStorage');
+  const token = userToken.get();
   
   if (!token) {
     throw new Error('No authentication token found');
@@ -622,7 +648,8 @@ export const sendPhoneOTP = async (phoneNumber: string): Promise<AuthResponse> =
   if (!response.ok) {
     if (response.status === 401) {
       // Token expired or invalid
-      tokenStorage.remove();
+      const { userToken } = require('@/lib/utils/tokenStorage');
+      userToken.remove();
       throw new Error('Session expired. Please login again.');
     }
     const error = await response.json();
@@ -640,7 +667,8 @@ export const sendPhoneOTP = async (phoneNumber: string): Promise<AuthResponse> =
  * Verify phone OTP API call
  */
 export const verifyPhoneOTP = async (phoneNumber: string, otp: string): Promise<AuthResponse> => {
-  const token = tokenStorage.get();
+  const { userToken } = require('@/lib/utils/tokenStorage');
+  const token = userToken.get();
   
   if (!token) {
     throw new Error('No authentication token found');
@@ -663,7 +691,8 @@ export const verifyPhoneOTP = async (phoneNumber: string, otp: string): Promise<
   if (!response.ok) {
     if (response.status === 401) {
       // Token expired or invalid
-      tokenStorage.remove();
+      const { userToken } = require('@/lib/utils/tokenStorage');
+      userToken.remove();
       throw new Error('Session expired. Please login again.');
     }
     const error = await response.json();
@@ -712,7 +741,8 @@ export const useVerifyPhoneOTP = () => {
  * Upload Emirates ID document API call
  */
 export const uploadEmiratesID = async (emiratesID: string, file: File): Promise<AuthResponse> => {
-  const token = tokenStorage.get();
+  const { userToken } = require('@/lib/utils/tokenStorage');
+  const token = userToken.get();
   
   if (!token) {
     throw new Error('No authentication token found');
@@ -739,7 +769,8 @@ export const uploadEmiratesID = async (emiratesID: string, file: File): Promise<
   if (!response.ok) {
     if (response.status === 401) {
       // Token expired or invalid
-      tokenStorage.remove();
+      const { userToken } = require('@/lib/utils/tokenStorage');
+      userToken.remove();
       throw new Error('Session expired. Please login again.');
     }
     const error = await response.json();

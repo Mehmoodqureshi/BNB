@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getCurrentUser, tokenStorage, logout as authLogout } from '@/lib/auth/authService';
+import { getCurrentUser, decodeToken } from '@/lib/auth/authService';
+import { hostToken } from '@/lib/utils/tokenStorage';
 
 export interface HostUser {
   id: string;
@@ -30,7 +31,16 @@ export const useHostAuth = () => {
 
   const checkAuth = () => {
     try {
-      const currentUser = getCurrentUser();
+      // First check if host token exists
+      const token = hostToken.get();
+      
+      if (!token) {
+        console.log('❌ No host token found in localStorage');
+        logout();
+        return;
+      }
+
+      const currentUser = decodeToken(token);
 
       // Check if user is logged in and has agent role (host)
       if (!currentUser || currentUser.role !== 'agent') {
@@ -45,7 +55,7 @@ export const useHostAuth = () => {
         name: currentUser.name,
         email: currentUser.email,
         role: currentUser.role,
-        token: tokenStorage.get() || '',
+        token: token,
       });
 
       setIsLoading(false);
@@ -56,7 +66,7 @@ export const useHostAuth = () => {
   };
 
   const logout = () => {
-    authLogout();
+    hostToken.remove(); // Remove host token specifically
     setHostUser(null);
     setIsLoading(false);
     
